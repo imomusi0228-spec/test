@@ -1253,57 +1253,9 @@ async function initSupabase(url, key) {
     updateTotalCount();
     return true;
   }
-}
-
-// === データベース初期設定ウィザード (SaaS版では未使用) ===
+}// === データベース初期設定ウィザード (SaaS版では未使用) ===
 function setupDbWizard() {
   // ウィザード無効化
-}
-  
-  if (form) {
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      let inputUrl = document.getElementById('setup-db-url').value.trim();
-      const inputKey = document.getElementById('setup-db-key').value.trim();
-      
-      // Project IDが入力された場合はURL形式に補完
-      if (inputUrl && !inputUrl.startsWith('http://') && !inputUrl.startsWith('https://')) {
-        const cleanId = inputUrl.replace(/[^a-zA-Z0-9]/g, '');
-        inputUrl = `https://${cleanId}.supabase.co`;
-      }
-      
-      const submitBtn = form.querySelector('button[type="submit"]');
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.textContent = "接続確認中...";
-      }
-      
-      try {
-        if (!window.supabase) {
-          throw new Error("Supabase SDKが読み込まれていません。ページを再読み込みしてください。");
-        }
-        // 接続テスト
-        const tempClient = window.supabase.createClient(inputUrl, inputKey);
-        const { error } = await tempClient.from('guests').select('count', { count: 'exact', head: true });
-        if (error) throw error;
-        
-        localStorage.setItem('supabase_url', inputUrl);
-        localStorage.setItem('supabase_key', inputKey);
-        modal.style.display = 'none';
-        showToast("クラウドDBへの接続に成功しました！");
-        
-        await initSupabase(inputUrl, inputKey);
-      } catch (err) {
-        console.error(err);
-        alert("データベースに接続できませんでした。以下の原因が考えられます：\n\n1. URLかanon keyが間違っている\n2. SQL Editorでテーブル作成用クエリを実行していない\n\nエラー詳細: " + err.message);
-      } finally {
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = "接続して顧客名簿を展開する 👥";
-        }
-      }
-    });
-  }
 }
 
 // === Supabase リアルタイム同期連携 ===
