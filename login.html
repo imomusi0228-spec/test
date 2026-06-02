@@ -284,9 +284,12 @@
         <button id="tab-signup" class="tab-btn" onclick="switchTab('signup')">新規アカウント作成</button>
       </div>
 
-      <!-- エラー・成功メッセージ表示領域 -->
-      <div id="error-alert" class="error-msg"></div>
-      <div id="success-alert" class="success-msg"></div>
+      <!-- 致命的な初期化エラー表示用（タブを切り替えても消えません） -->
+      <div id="fatal-error-alert" class="error-msg" style="margin-bottom: 20px;"></div>
+
+      <!-- 通常のエラー・成功メッセージ表示領域 -->
+      <div id="error-alert" class="error-msg" style="margin-bottom: 20px;"></div>
+      <div id="success-alert" class="success-msg" style="margin-bottom: 20px;"></div>
 
       <!-- 1. サインインフォーム -->
       <form id="form-signin" onsubmit="handleSignIn(event)">
@@ -353,6 +356,28 @@
           アカウント作成
         </button>
       </form>
+
+      <!-- 手動接続設定（フォールバック用） -->
+      <div class="db-manual-setup" style="margin-top: 25px; border-top: 1px solid var(--panel-border); padding-top: 15px; text-align: center;">
+        <a href="#" id="toggle-manual-db" style="font-size: 0.8rem; color: var(--text-muted); display: inline-flex; align-items: center; gap: 5px; text-decoration: none;" onclick="toggleManualDb(event)">
+          ⚙️ データベースを手動設定する (接続できない場合)
+        </a>
+        <div id="manual-db-form" style="display: none; margin-top: 15px; text-align: left; background: rgba(10,10,18,0.3); padding: 15px; border-radius: 12px; border: 1px solid var(--panel-border);">
+          <p style="font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.4;">
+            Vercelの環境設定（SUPABASE_URL 等）がまだ設定されていない場合は、手動でキーを設定して一時的に接続できます。
+          </p>
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label" style="font-size: 0.75rem;" for="manual-url">Supabase URL または Project ID</label>
+            <input type="text" id="manual-url" class="form-input" style="padding: 8px 12px; font-size: 0.85rem;" placeholder="https://xxx.supabase.co">
+          </div>
+          <div class="form-group" style="margin-bottom: 12px;">
+            <label class="form-label" style="font-size: 0.75rem;" for="manual-key">Supabase anon public key</label>
+            <input type="password" id="manual-key" class="form-input" style="padding: 8px 12px; font-size: 0.85rem;" placeholder="eyJhbGciOiJIUzI1Ni...">
+          </div>
+          <button type="button" class="action-btn" style="padding: 8px; font-size: 0.85rem; margin-top: 5px;" onclick="handleManualConnect()">接続情報を保存して適用</button>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -361,29 +386,98 @@
 
     // 起動時に環境設定をAPIから取得して初期化
     document.addEventListener('DOMContentLoaded', async () => {
+      await tryInitSupabase();
+    });
+
+    async function tryInitSupabase() {
+      clearAlerts();
+      document.getElementById('fatal-error-alert').style.display = 'none';
+
       try {
-        const res = await fetch('/api/config');
-        if (!res.ok) throw new Error('接続設定APIの取得に失敗しました。');
-        const config = await res.json();
+        let config = {};
         
-        if (!config.supabaseUrl || !config.supabaseKey) {
-          throw new Error('Supabaseの環境変数が設定されていません。');
+        // 1. APIから設定取得
+        try {
+          const res = await fetch('/api/config');
+          if (res.ok) {
+            config = await res.json();
+          }
+        } catch (e) {
+          console.warn('API config load failed, fallback to localStorage.');
+        }
+        
+        let url = config.supabaseUrl || localStorage.getItem('supabase_url');
+        let key = config.supabaseKey || localStorage.getItem('supabase_key');
+        
+        if (!url || !key) {
+          throw new Error('Supabaseの接続キーが見つかりません。Vercelの環境変数(SUPABASE_URL, SUPABASE_KEY)を登録するか、下部の「手動設定」から入力してください。');
+        }
+
+        // Project IDが入力された場合はURL形式に補完
+        if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+          const cleanId = url.replace(/[^a-zA-Z0-9]/g, '');
+          url = `https://${cleanId}.supabase.co`;
         }
 
         // Supabaseクライアントの初期化
-        supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseKey);
+        supabaseClient = window.supabase.createClient(url, key);
         
+        // ボタンの無効化を解除
+        document.getElementById('btn-signin-submit').disabled = false;
+        document.getElementById('btn-signup-submit').disabled = false;
+
         // ログイン状態であれば自動でポータルへ
         const { data: { session } } = await supabaseClient.auth.getSession();
         if (session) {
+          // 接続URLとキーをlocalStorageに同期（app.jsとの互換用）
+          localStorage.setItem('supabase_url', url);
+          localStorage.setItem('supabase_key', key);
           window.location.href = 'portal.html';
         }
       } catch (err) {
-        showError('システム初期化エラー: ' + err.message);
+        console.error(err);
+        showFatalError(err.message);
+        
+        // エラー時は手動フォームに現在保存されている値をプリセットして入力しやすくする
+        document.getElementById('manual-url').value = localStorage.getItem('supabase_url') || '';
+        document.getElementById('manual-key').value = localStorage.getItem('supabase_key') || '';
+        
+        // ボタンを一時無効化
         document.getElementById('btn-signin-submit').disabled = true;
         document.getElementById('btn-signup-submit').disabled = true;
       }
-    });
+    }
+
+    // 手動設定アコーディオンの切り替え
+    function toggleManualDb(e) {
+      e.preventDefault();
+      const form = document.getElementById('manual-db-form');
+      if (form.style.display === 'none') {
+        form.style.display = 'block';
+      } else {
+        form.style.display = 'none';
+      }
+    }
+
+    // 手動設定の適用
+    async function handleManualConnect() {
+      const urlInput = document.getElementById('manual-url').value.trim();
+      const keyInput = document.getElementById('manual-key').value.trim();
+
+      if (!urlInput || !keyInput) {
+        alert('URLとキーの両方を入力してください。');
+        return;
+      }
+
+      localStorage.setItem('supabase_url', urlInput);
+      localStorage.setItem('supabase_key', keyInput);
+      
+      alert('接続設定を保存しました。再接続を試みます。');
+      
+      // フォームを閉じて再初期化
+      document.getElementById('manual-db-form').style.display = 'none';
+      await tryInitSupabase();
+    }
 
     // タブ切り替え
     function switchTab(tab) {
@@ -531,6 +625,12 @@
         button.disabled = false;
         loader.style.display = 'none';
       }
+    }
+
+    function showFatalError(msg) {
+      const el = document.getElementById('fatal-error-alert');
+      el.innerHTML = '⚠️ ' + msg;
+      el.style.display = 'block';
     }
 
     function showError(msg) {
