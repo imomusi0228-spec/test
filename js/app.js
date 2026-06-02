@@ -23,7 +23,7 @@ let guests = [];
 let selectedGuestId = null;
 let currentTab = '全て';
 let searchQuery = '';
-let supabase = null;
+let dbClient = null;
 
 // === 定数 ===
 const STORAGE_KEY = 'vrc_cast_companion_guests';
@@ -90,9 +90,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 // === データ保存・読み込み ===
 async function loadData() {
-  if (supabase) {
+  if (dbClient) {
     try {
-      const { data, error } = await supabase.from('guests').select('*');
+      const { data, error } = await dbClient.from('guests').select('*');
       if (error) throw error;
       
       guests = data.map(dbGuest => ({
@@ -207,7 +207,7 @@ async function saveGuest(guest) {
   } catch (e) {}
 
   // Supabaseに直接保存
-  if (supabase) {
+  if (dbClient) {
     try {
       const dbGuest = {
         id: guest.id,
@@ -224,7 +224,7 @@ async function saveGuest(guest) {
         notes: guest.notes || []
       };
       
-      const { error } = await supabase
+      const { error } = await dbClient
         .from('guests')
         .upsert(dbGuest);
       if (error) throw error;
@@ -656,9 +656,9 @@ async function deleteGuest(id) {
     });
   } catch (e) {}
 
-  if (supabase) {
+  if (dbClient) {
     try {
-      const { error } = await supabase.from('guests').delete().eq('id', id);
+      const { error } = await dbClient.from('guests').delete().eq('id', id);
       if (error) throw error;
     } catch (e) {
       console.error("[Supabase] データの削除に失敗しました:", e);
@@ -1014,7 +1014,7 @@ function escapeHTML(str) {
 async function initSupabase(url, key) {
   if (window.supabase) {
     try {
-      supabase = window.supabase.createClient(url, key);
+      dbClient = window.supabase.createClient(url, key);
       await loadData();
       renderGuestList();
       updateTotalCount();
@@ -1103,10 +1103,10 @@ function setupDbWizard() {
 
 // === Supabase リアルタイム同期連携 ===
 function setupSupabaseRealtime() {
-  if (!supabase) return;
+  if (!dbClient) return;
   
   // guests テーブルの変更検知（他ブラウザからの追加・編集をリアルタイム受信）
-  supabase
+  dbClient
     .channel('db-guests-channel')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'guests' }, async () => {
       await loadData();
@@ -1118,7 +1118,7 @@ function setupSupabaseRealtime() {
     .subscribe();
     
   // realtime_events テーブルの検知（ローカル監視スクリプトやUdonからの通知）
-  supabase
+  dbClient
     .channel('db-events-channel')
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'realtime_events' }, payload => {
       const newEvent = payload.new;
