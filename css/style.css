@@ -491,6 +491,12 @@ body {
   border: 1px solid rgba(0, 240, 255, 0.25);
 }
 
+.mini-tag.tag-semi-regular {
+  background: rgba(189, 0, 255, 0.15);
+  color: #d880ff;
+  border: 1px solid rgba(189, 0, 255, 0.25);
+}
+
 /* 右ページプレースホルダー */
 .placeholder-content {
   display: flex;
@@ -656,6 +662,12 @@ body {
   background: rgba(0, 240, 255, 0.1);
   color: var(--color-cyan);
   border-color: rgba(0, 240, 255, 0.2);
+}
+
+.tag.tag-semi-regular {
+  background: rgba(189, 0, 255, 0.1);
+  color: #d880ff;
+  border-color: rgba(189, 0, 255, 0.2);
 }
 
 /* プロフィール詳細グリッド */

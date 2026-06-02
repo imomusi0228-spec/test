@@ -5,9 +5,20 @@ let currentTab = '全て';
 let searchQuery = '';
 let dbClient = null;
 
+// しきい値設定（デフォルト値）
+let semiRegularThreshold = 3;
+let regularThreshold = 5;
+let vipThreshold = 10;
+
+function loadThresholds() {
+  semiRegularThreshold = parseInt(localStorage.getItem('threshold_semi_regular') || '3', 10);
+  regularThreshold = parseInt(localStorage.getItem('threshold_regular') || '5', 10);
+  vipThreshold = parseInt(localStorage.getItem('threshold_vip') || '10', 10);
+}
+
 // === 定数 ===
 const STORAGE_KEY = 'vrc_cast_companion_guests';
-const INDEX_TABS = ['全て', 'あ', 'か', 'さ', 'た', 'な', 'は', 'ま', 'や', 'ら', 'わ', 'A-Z', '他'];
+const INDEX_TABS = ['全て', 'キャスト', 'あ', 'か', 'さ', 'た', 'な', 'は', 'ま', 'や', 'ら', 'わ', 'A-Z', '他'];
 
 // === サンプルデモデータ ===
 const DEMO_GUEST_DATA = [
@@ -63,6 +74,7 @@ const DEMO_GUEST_DATA = [
 
 // === 起動時の初期化処理 ===
 document.addEventListener('DOMContentLoaded', async () => {
+  loadThresholds();
   setupIndexTabs();
   setupEventListeners();
   setupDbWizard();
@@ -85,6 +97,7 @@ async function loadData() {
         firstVisit: dbGuest.first_visit || '',
         lastVisit: dbGuest.last_visit || '',
         visitCount: dbGuest.visit_count || 1,
+        isCast: dbGuest.is_cast || false,
         tags: dbGuest.tags || [],
         characteristics: dbGuest.characteristics || '',
         notes: dbGuest.notes || []
@@ -112,6 +125,7 @@ async function loadData() {
         if (!g.notes) g.notes = [];
         if (!g.tags) g.tags = [];
         if (g.visitCount === undefined) g.visitCount = 1;
+        if (g.isCast === undefined) g.isCast = false;
       });
     } else {
       throw new Error('Server response not OK');
@@ -126,6 +140,7 @@ async function loadData() {
           if (!g.notes) g.notes = [];
           if (!g.tags) g.tags = [];
           if (g.visitCount === undefined) g.visitCount = 1;
+          if (g.isCast === undefined) g.isCast = false;
         });
       } catch (err) {
         guests = [];
@@ -199,6 +214,7 @@ async function saveGuest(guest) {
         first_visit: guest.firstVisit || null,
         last_visit: guest.lastVisit || null,
         visit_count: guest.visitCount || 1,
+        is_cast: guest.isCast || false,
         tags: guest.tags || [],
         characteristics: guest.characteristics || '',
         notes: guest.notes || []
@@ -295,9 +311,15 @@ function renderGuestList() {
     
     // インデックスタブでのフィルター
     if (currentTab !== '全て') {
-      const group = getIndexGroup(guest.pronunciation, guest.name);
-      if (group !== currentTab) {
-        return false;
+      if (currentTab === 'キャスト') {
+        if (!guest.isCast) {
+          return false;
+        }
+      } else {
+        const group = getIndexGroup(guest.pronunciation, guest.name);
+        if (group !== currentTab) {
+          return false;
+        }
       }
     }
     
@@ -325,19 +347,44 @@ function renderGuestList() {
     const initial = guest.name ? guest.name.charAt(0).toUpperCase() : 'G';
     const lastVisitText = guest.lastVisit ? guest.lastVisit.replace(/-/g, '/') : '未設定';
     
+    // 自動バッジ算出（VIP, 常連, 準常連）
+    let autoBadge = null;
+    const visits = guest.visitCount || 1;
+    if (visits >= vipThreshold) {
+      autoBadge = '👑 VIP';
+    } else if (visits >= regularThreshold) {
+      autoBadge = '常連';
+    } else if (visits >= semiRegularThreshold) {
+      autoBadge = '準常連';
+    }
+
+    // 元のタグから重複を排除して、しきい値タグを除外
+    let cleanTags = (guest.tags || []).filter(t => 
+      t !== 'VIP' && t !== '👑 VIP' && t !== '常連' && t !== '準常連'
+    );
+
+    // 自動バッジがあれば先頭に追加
+    if (autoBadge) {
+      cleanTags.unshift(autoBadge);
+    }
+
     // タグのHTML生成
-    const tagsHTML = guest.tags.slice(0, 3).map(tag => {
+    const tagsHTML = cleanTags.slice(0, 3).map(tag => {
       let extraClass = '';
-      if (tag === 'VIP') extraClass = 'tag-vip';
-      else if (tag === '常連' || tag === '準常連') extraClass = 'tag-regular';
+      if (tag === 'VIP' || tag === '👑 VIP') extraClass = 'tag-vip';
+      else if (tag === '常連') extraClass = 'tag-regular';
+      else if (tag === '準常連') extraClass = 'tag-semi-regular';
       return `<span class="mini-tag ${extraClass}">${escapeHTML(tag)}</span>`;
     }).join('');
     
+    // キャストの場合、お名前の前に 🌟 マークを表示
+    const displayName = guest.isCast ? `🌟 ${guest.name}` : guest.name;
+
     card.innerHTML = `
       <div class="guest-card-avatar">${escapeHTML(initial)}</div>
       <div class="guest-card-info">
         <div class="guest-card-name-row">
-          <span class="guest-card-name">${escapeHTML(guest.name)}</span>
+          <span class="guest-card-name">${escapeHTML(displayName)}</span>
           <span class="guest-card-last-visit">${escapeHTML(lastVisitText)}</span>
         </div>
         <div class="guest-card-tags">
@@ -371,7 +418,7 @@ function selectGuest(id) {
   document.getElementById('no-selection-placeholder').style.display = 'none';
   document.getElementById('detail-content').style.display = 'block';
   
-  document.getElementById('detail-name').textContent = guest.name;
+  document.getElementById('detail-name').textContent = guest.isCast ? `🌟 ${guest.name}` : guest.name;
   document.getElementById('detail-pronunciation').textContent = guest.pronunciation ? `（${guest.pronunciation}）` : '';
   document.getElementById('detail-vrc-name').textContent = guest.vrcName ? `@${guest.vrcName}` : '@未登録';
   
@@ -393,12 +440,33 @@ function selectGuest(id) {
   // タグ
   const tagsContainer = document.getElementById('detail-tags');
   tagsContainer.innerHTML = '';
-  if (guest.tags && guest.tags.length > 0) {
-    guest.tags.forEach(tag => {
+  
+  // 自動バッジ算出（VIP, 常連, 準常連）
+  let autoBadge = null;
+  const visits = guest.visitCount || 1;
+  if (visits >= vipThreshold) {
+    autoBadge = '👑 VIP';
+  } else if (visits >= regularThreshold) {
+    autoBadge = '常連';
+  } else if (visits >= semiRegularThreshold) {
+    autoBadge = '準常連';
+  }
+
+  // 重複排除とフィルタリング
+  let displayTags = (guest.tags || []).filter(t => 
+    t !== 'VIP' && t !== '👑 VIP' && t !== '常連' && t !== '準常連'
+  );
+  if (autoBadge) {
+    displayTags.unshift(autoBadge);
+  }
+
+  if (displayTags.length > 0) {
+    displayTags.forEach(tag => {
       const span = document.createElement('span');
       let extraClass = '';
-      if (tag === 'VIP') extraClass = 'tag-vip';
-      else if (tag === '常連' || tag === '準常連') extraClass = 'tag-regular';
+      if (tag === 'VIP' || tag === '👑 VIP') extraClass = 'tag-vip';
+      else if (tag === '常連') extraClass = 'tag-regular';
+      else if (tag === '準常連') extraClass = 'tag-semi-regular';
       span.className = `tag ${extraClass}`;
       span.textContent = tag;
       tagsContainer.appendChild(span);
@@ -530,6 +598,7 @@ function openGuestModal(guestId = null) {
       document.getElementById('form-first-visit').value = guest.firstVisit || '';
       document.getElementById('form-last-visit').value = guest.lastVisit || '';
       document.getElementById('form-visit-count').value = guest.visitCount || 1;
+      document.getElementById('form-is-cast').checked = guest.isCast || false;
       document.getElementById('form-tags').value = (guest.tags || []).join(', ');
       document.getElementById('form-characteristics').value = guest.characteristics || '';
     }
@@ -539,6 +608,7 @@ function openGuestModal(guestId = null) {
     document.getElementById('form-first-visit').value = getTodayDateString();
     document.getElementById('form-last-visit').value = getTodayDateString();
     document.getElementById('form-visit-count').value = 1;
+    document.getElementById('form-is-cast').checked = false;
   }
   
   modal.style.display = 'flex';
@@ -560,6 +630,7 @@ async function handleGuestFormSubmit(e) {
   const firstVisit = document.getElementById('form-first-visit').value;
   const lastVisit = document.getElementById('form-last-visit').value;
   const visitCount = parseInt(document.getElementById('form-visit-count').value, 10) || 1;
+  const isCast = document.getElementById('form-is-cast').checked;
   const characteristics = document.getElementById('form-characteristics').value.trim();
   
   // タグ文字列のパース (カンマまたはスペース区切り)
@@ -582,6 +653,7 @@ async function handleGuestFormSubmit(e) {
         firstVisit,
         lastVisit,
         visitCount,
+        isCast,
         tags,
         characteristics
       };
@@ -600,6 +672,7 @@ async function handleGuestFormSubmit(e) {
       firstVisit,
       lastVisit,
       visitCount,
+      isCast,
       tags,
       characteristics,
       notes: []
@@ -659,6 +732,11 @@ function openSettingsModal() {
   document.getElementById('selected-file-name').textContent = "選択されていません";
   document.getElementById('import-btn').disabled = true;
   document.getElementById('import-file-input').value = '';
+  
+  // しきい値を入力欄にセット
+  document.getElementById('threshold-semi-regular').value = semiRegularThreshold;
+  document.getElementById('threshold-regular').value = regularThreshold;
+  document.getElementById('threshold-vip').value = vipThreshold;
 }
 
 function closeSettingsModal() {
@@ -894,6 +972,36 @@ function setupEventListeners() {
   document.getElementById('import-file-input').addEventListener('change', handleImportFileChange);
   document.getElementById('import-btn').addEventListener('click', importData);
   document.getElementById('demo-data-btn').addEventListener('click', generateDemoData);
+  
+  // しきい値の保存処理
+  const saveThresholdsBtn = document.getElementById('save-thresholds-btn');
+  if (saveThresholdsBtn) {
+    saveThresholdsBtn.addEventListener('click', () => {
+      const semiVal = parseInt(document.getElementById('threshold-semi-regular').value, 10) || 3;
+      const regVal = parseInt(document.getElementById('threshold-regular').value, 10) || 5;
+      const vipVal = parseInt(document.getElementById('threshold-vip').value, 10) || 10;
+      
+      if (semiVal >= regVal || regVal >= vipVal) {
+        alert("しきい値の順序が正しくありません。(準常連 < 常連 < VIP となるようにしてください)");
+        return;
+      }
+      
+      semiRegularThreshold = semiVal;
+      regularThreshold = regVal;
+      vipThreshold = vipVal;
+      
+      localStorage.setItem('threshold_semi_regular', semiVal);
+      localStorage.setItem('threshold_regular', regVal);
+      localStorage.setItem('threshold_vip', vipVal);
+      
+      renderGuestList();
+      if (selectedGuestId) {
+        selectGuest(selectedGuestId);
+      }
+      showToast("しきい値設定を保存しました");
+    });
+  }
+
   const editDbBtn = document.getElementById('edit-db-btn');
   if (editDbBtn) {
     editDbBtn.addEventListener('click', () => {

@@ -240,6 +240,7 @@ create table if not exists guests (
   first_visit text,
   last_visit text,
   visit_count integer default 1,
+  is_cast boolean default false,
   tags text[] default '{}',
   characteristics text,
   notes jsonb default '[]'::jsonb
@@ -258,6 +259,14 @@ create table if not exists realtime_events (
 -- リアルタイム配信（レプリケーション）を有効化
 alter publication supabase_realtime add table guests;
 alter publication supabase_realtime add table realtime_events;</code></pre>
+
+      <div class="alert" style="background: rgba(189, 0, 255, 0.05); border: 1px solid rgba(189, 0, 255, 0.15); margin-top: 15px;">
+        <div class="alert-title" style="color: var(--color-purple);">🔄 既存の環境からアップデートする場合</div>
+        <p>
+          すでに本システムを導入済みで、新しいキャスト機能（チェックボックスとキャストタブ）を有効にしたい場合は、Supabaseの <b>SQL Editor</b> で以下のクエリを実行し、テーブルにカラムを追加してください：
+        </p>
+        <pre><code style="color: #00f0ff;">alter table guests add column if not exists is_cast boolean default false;</code></pre>
+      </div>
 
       <h3 style="margin-top: 25px; color: var(--color-cyan); border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 8px;">🔑 接続情報（Project ID と APIキー）の取得手順</h3>
       <p>WebダッシュボードやUnity（VRChat）と接続するためのIDとキーをコピーします：</p>

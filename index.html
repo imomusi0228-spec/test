@@ -231,8 +231,11 @@
             <label for="form-visit-count">来店回数</label>
             <input type="number" id="form-visit-count" min="1" value="1">
           </div>
-          <div class="form-group">
-            <!-- スペース調整用の空セル -->
+          <div class="form-group" style="display: flex; align-items: flex-end; padding-bottom: 8px;">
+            <label for="form-is-cast" style="display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
+              <input type="checkbox" id="form-is-cast" style="width: auto; height: auto; transform: scale(1.1); margin: 0;">
+              <span style="font-weight: 500; color: var(--color-cyan);">🌟 キャストとして登録する</span>
+            </label>
           </div>
         </div>
 
@@ -288,6 +291,28 @@
           <h4>デモデータの作成</h4>
           <p>ツールの動作確認用に、サンプルの顧客データを生成します。（既存のデータは削除されません）</p>
           <button id="demo-data-btn" class="btn btn-secondary">🪄 デモデータを追加</button>
+        </section>
+
+        <hr class="settings-divider">
+
+        <section class="settings-section">
+          <h4>自動バッジ認定のしきい値設定</h4>
+          <p>来店回数に応じて自動的に「準常連」「常連」「VIP」のバッジを付与するしきい値を設定します。</p>
+          <div class="thresholds-row" style="display: flex; gap: 15px; margin-bottom: 15px; margin-top: 10px;">
+            <div class="form-group" style="flex: 1;">
+              <label for="threshold-semi-regular" style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 5px;">準常連（回以上）</label>
+              <input type="number" id="threshold-semi-regular" min="1" value="3" style="width: 100%; padding: 8px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); color: #fff;">
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label for="threshold-regular" style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 5px;">常連（回以上）</label>
+              <input type="number" id="threshold-regular" min="1" value="5" style="width: 100%; padding: 8px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); color: #fff;">
+            </div>
+            <div class="form-group" style="flex: 1;">
+              <label for="threshold-vip" style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 5px;">👑 VIP（回以上）</label>
+              <input type="number" id="threshold-vip" min="1" value="10" style="width: 100%; padding: 8px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); color: #fff;">
+            </div>
+          </div>
+          <button id="save-thresholds-btn" class="btn btn-primary" style="margin-bottom: 10px;">💾 設定を保存する</button>
         </section>
 
         <hr class="settings-divider">
