@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="css/style.css">
   <!-- Supabase JS Client CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -29,7 +29,7 @@
                 <span class="logo-icon">📖</span>
                 <h1 class="app-title">VRC Cast Companion</h1>
               </div>
-              <p class="subtitle">お嬢の顧客魔導書へようこそ</p>
+              <p class="subtitle">顧客魔導書へようこそ</p>
             </header>
 
             <!-- 検索 & アクションバー -->
@@ -304,7 +304,7 @@
       </div>
       <div class="modal-body">
         <p class="setup-intro" style="font-size: 12px; line-height: 1.6; color: var(--text-secondary); margin-bottom: 15px;">
-          お嬢、顧客魔導書へようこそ。<br>
+          顧客魔導書へようこそ。<br>
           このアプリをクラウド（Supabase）と連携し、誰でもスマホ等から共同編集できるようにするため、以下の設定を行ってください。
         </p>
         
@@ -313,34 +313,8 @@
           <ol style="padding-left: 15px; display: flex; flex-direction: column; gap: 6px; color: var(--text-secondary);">
             <li><a href="https://supabase.com" target="_blank" style="color: var(--color-cyan); text-decoration: underline;">Supabase (supabase.com)</a> にサインアップし、新規プロジェクトを作成します。</li>
             <li>プロジェクト画面の <b>Project Settings ➔ API</b> ページを開き、<b>Project URL</b> と <b>anon (public)</b> キーをコピーし、以下に入力します。</li>
-            <li>プロジェクト画面 of <b>SQL Editor ➔ New query</b> を開き、以下のSQLを貼り付けて <b>Run</b> ボタンを押します。</li>
+            <li>プロジェクト画面の <b>SQL Editor ➔ New query</b> を開き、マニュアルに記載されているSQLを貼り付けて <b>Run</b> ボタンを押します。</li>
           </ol>
-          <textarea readonly style="width: 100%; height: 80px; font-family: monospace; font-size: 9px; margin-top: 8px; background: rgba(0,0,0,0.4); color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; resize: none;" onclick="this.select()">-- SQL Editorに貼り付けて実行してください
-create table if not exists guests (
-  id text primary key,
-  name text not null,
-  pronunciation text,
-  vrc_name text,
-  x_id text,
-  discord_id text,
-  first_visit text,
-  last_visit text,
-  visit_count integer default 1,
-  tags text[] default '{}',
-  characteristics text,
-  notes jsonb default '[]'::jsonb
-);
-
-create table if not exists realtime_events (
-  id bigint generated always as identity primary key,
-  type text not null,
-  player_name text,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-
-alter publication supabase_realtime add table guests;
-alter publication supabase_realtime add table realtime_events;
-</textarea>
         </div>
 
         <form id="db-setup-form" class="setup-form" style="display: flex; flex-direction: column; gap: 15px;">
@@ -366,6 +340,6 @@ alter publication supabase_realtime add table realtime_events;
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <script src="js/app.js"></script>
 </body>
 </html>
