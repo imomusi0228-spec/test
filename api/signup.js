@@ -69,6 +69,8 @@ module.exports = async (req, res) => {
     }
 
     const user = authData.user;
+    // エラー時にクリーンアップするための作成済みユーザー参照
+    var createdUser = user;
     let targetOrgId = org_id;
 
     // 2. 店舗オーナー登録の場合は組織(organizations)を作成
@@ -114,8 +116,6 @@ module.exports = async (req, res) => {
       });
 
     if (profileError) {
-      // 失敗した場合はAuthユーザーをクリーンアップ
-      await supabase.auth.admin.deleteUser(user.id);
       throw profileError;
     }
 
@@ -134,6 +134,14 @@ module.exports = async (req, res) => {
 
   } catch (err) {
     console.error('[Signup API Error]:', err);
+    // 作成済みのAuthユーザーがあれば削除してロールバック
+    if (typeof createdUser !== 'undefined' && createdUser && createdUser.id) {
+      try {
+        await supabase.auth.admin.deleteUser(createdUser.id);
+      } catch (cleanupErr) {
+        console.error('Failed to cleanup user after error:', cleanupErr);
+      }
+    }
     return res.status(500).json({ error: 'サーバー内部エラーが発生しました: ' + err.message });
   }
 };
