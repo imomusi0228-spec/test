@@ -99,6 +99,7 @@ async function loadData() {
         visitCount: dbGuest.visit_count || 1,
         isCast: dbGuest.is_cast || false,
         isActiveToday: dbGuest.is_active_today || false,
+        gender: dbGuest.gender || '',
         tags: dbGuest.tags || [],
         characteristics: dbGuest.characteristics || '',
         notes: dbGuest.notes || []
@@ -128,6 +129,7 @@ async function loadData() {
         if (g.visitCount === undefined) g.visitCount = 1;
         if (g.isCast === undefined) g.isCast = false;
         if (g.isActiveToday === undefined) g.isActiveToday = false;
+        if (g.gender === undefined) g.gender = '';
       });
     } else {
       throw new Error('Server response not OK');
@@ -144,6 +146,7 @@ async function loadData() {
           if (g.visitCount === undefined) g.visitCount = 1;
           if (g.isCast === undefined) g.isCast = false;
           if (g.isActiveToday === undefined) g.isActiveToday = false;
+          if (g.gender === undefined) g.gender = '';
         });
       } catch (err) {
         guests = [];
@@ -219,6 +222,7 @@ async function saveGuest(guest) {
         visit_count: guest.visitCount || 1,
         is_cast: guest.isCast || false,
         is_active_today: guest.isActiveToday || false,
+        gender: guest.gender || '',
         tags: guest.tags || [],
         characteristics: guest.characteristics || '',
         notes: guest.notes || []
@@ -456,6 +460,7 @@ function selectGuest(id) {
   document.getElementById('detail-first-visit').textContent = guest.firstVisit ? guest.firstVisit.replace(/-/g, '/') : '未登録';
   document.getElementById('detail-last-visit').textContent = guest.lastVisit ? guest.lastVisit.replace(/-/g, '/') : '未登録';
   document.getElementById('detail-visit-count').textContent = `${guest.visitCount || 1}回`;
+  document.getElementById('detail-gender').textContent = guest.gender || '未設定';
   
   // 特徴
   document.getElementById('detail-characteristics').textContent = guest.characteristics || '特徴・好みの情報はまだ登録されていません。';
@@ -624,6 +629,7 @@ function openGuestModal(guestId = null) {
       document.getElementById('form-is-cast').checked = guest.isCast || false;
       document.getElementById('form-is-active-today').checked = guest.isActiveToday || false;
       document.getElementById('form-active-today-container').style.display = guest.isCast ? 'block' : 'none';
+      document.getElementById('form-gender').value = guest.gender || '';
       document.getElementById('form-tags').value = (guest.tags || []).join(', ');
       document.getElementById('form-characteristics').value = guest.characteristics || '';
     }
@@ -636,6 +642,7 @@ function openGuestModal(guestId = null) {
     document.getElementById('form-is-cast').checked = false;
     document.getElementById('form-is-active-today').checked = false;
     document.getElementById('form-active-today-container').style.display = 'none';
+    document.getElementById('form-gender').value = '';
   }
   
   modal.style.display = 'flex';
@@ -659,6 +666,7 @@ async function handleGuestFormSubmit(e) {
   const visitCount = parseInt(document.getElementById('form-visit-count').value, 10) || 1;
   const isCast = document.getElementById('form-is-cast').checked;
   const isActiveToday = isCast ? document.getElementById('form-is-active-today').checked : false;
+  const gender = document.getElementById('form-gender').value;
   const characteristics = document.getElementById('form-characteristics').value.trim();
   
   // タグ文字列のパース (カンマまたはスペース区切り)
@@ -683,6 +691,7 @@ async function handleGuestFormSubmit(e) {
         visitCount,
         isCast,
         isActiveToday,
+        gender,
         tags,
         characteristics
       };
@@ -703,6 +712,7 @@ async function handleGuestFormSubmit(e) {
       visitCount,
       isCast,
       isActiveToday,
+      gender,
       tags,
       characteristics,
       notes: []

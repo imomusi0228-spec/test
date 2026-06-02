@@ -151,6 +151,10 @@
                   <span class="info-label">来店回数</span>
                   <span id="detail-visit-count" class="info-value">1回</span>
                 </div>
+                <div class="info-item">
+                  <span class="info-label">性別</span>
+                  <span id="detail-gender" class="info-value">未設定</span>
+                </div>
                 <div class="info-item full-width">
                   <span class="info-label">特徴・好み（アバター、好きな飲み物など）</span>
                   <p id="detail-characteristics" class="info-text">未設定</p>
@@ -208,9 +212,20 @@
           </div>
         </div>
 
-        <div class="form-group">
-          <label for="form-vrc-name">VRChatユーザー名（ID）</label>
-          <input type="text" id="form-vrc-name" placeholder="例：Alice_VRC">
+        <div class="form-row split">
+          <div class="form-group">
+            <label for="form-vrc-name">VRChatユーザー名（ID）</label>
+            <input type="text" id="form-vrc-name" placeholder="例：Alice_VRC">
+          </div>
+          <div class="form-group">
+            <label for="form-gender">性別（タイプ）</label>
+            <select id="form-gender" class="form-select">
+              <option value="">未設定</option>
+              <option value="女性型">女性型</option>
+              <option value="男性型">男性型</option>
+              <option value="中性/その他">中性/その他</option>
+            </select>
+          </div>
         </div>
 
         <div class="form-row split">
