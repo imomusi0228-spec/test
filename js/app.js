@@ -89,14 +89,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Supabase初期化
-    await initSupabase(config.supabaseUrl, config.supabaseKey);
+    const initialized = await initSupabase(config.supabaseUrl, config.supabaseKey);
+    if (!initialized) {
+      // リダイレクト等の処理が行われた場合はここで終了
+      return;
+    }
   } catch (err) {
     console.error("Initialization failed:", err);
     // Vercel上の環境変数が設定されていない場合やローカルフォールバック用
     const url = localStorage.getItem('supabase_url');
     const key = localStorage.getItem('supabase_key');
     if (url && key) {
-      await initSupabase(url, key);
+      const initialized = await initSupabase(url, key);
+      if (!initialized) return;
     } else {
       // 最終フォールバック (ローカルテスト)
       const params = new URLSearchParams(window.location.search);
@@ -1200,7 +1205,7 @@ async function initSupabase(url, key) {
       const { data: { session }, error: authError } = await dbClient.auth.getSession();
       if (authError || !session) {
         window.location.href = 'login.html';
-        return;
+        return false;
       }
       
       // プロフィールの取得
@@ -1212,7 +1217,7 @@ async function initSupabase(url, key) {
       currentBookId = params.get('book_id');
       if (!currentBookId) {
         window.location.href = 'portal.html';
-        return;
+        return false;
       }
       
       // 手帳の名前を取得してタイトルに表示
@@ -1223,18 +1228,19 @@ async function initSupabase(url, key) {
       } else {
         alert("指定された手帳が見つからないか、アクセス権限がありません。");
         window.location.href = 'portal.html';
-        return;
+        return false;
       }
 
       await loadData();
       renderGuestList();
       updateTotalCount();
       setupSupabaseRealtime();
+      return true;
     } catch (err) {
       console.error("Supabaseの初期化またはデータロードに失敗しました:", err);
       // セッションエラー等ならログインに戻す
       window.location.href = 'login.html';
-      throw err;
+      return false;
     }
   } else {
     const errorMsg = "Supabase JS SDKがロードされていません。";
@@ -1245,6 +1251,7 @@ async function initSupabase(url, key) {
     await loadData();
     renderGuestList();
     updateTotalCount();
+    return true;
   }
 }
 
