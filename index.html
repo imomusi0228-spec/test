@@ -12,13 +12,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <!-- 緊急デバッグ用エラー表示パネル（動作確認後に削除予定） -->
-  <div id="debug-error-panel" style="position: fixed; top: 0; left: 0; width: 100vw; background: rgba(255, 0, 0, 0.95); color: white; padding: 15px; font-family: monospace; font-size: 14px; z-index: 99999; display: none; box-sizing: border-box; max-height: 50vh; overflow-y: auto;">
-    <h3 style="margin-bottom: 10px; font-weight: bold; border-bottom: 1px solid white; padding-bottom: 5px; font-size: 16px;">⚠️ 画面エラー検知パネル (ここにエラーが表示されている場合はその文字を教えてください)</h3>
-    <pre id="debug-error-content" style="white-space: pre-wrap; margin: 0; font-size: 12px; font-family: monospace;"></pre>
-    <button onclick="document.getElementById('debug-error-panel').style.display='none'" style="margin-top: 10px; padding: 6px 12px; background: white; color: red; border: none; cursor: pointer; font-weight: bold; border-radius: 4px;">パネルを閉じる</button>
-  </div>
-
   <!-- 背景のネオン発光グラデーション -->
   <div class="ambient-glow bg-glow-1"></div>
   <div class="ambient-glow bg-glow-2"></div>

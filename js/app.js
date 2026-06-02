@@ -1,23 +1,3 @@
-// === 緊急デバッグ用グローバルエラーキャッチ ===
-window.onerror = function(message, source, lineno, colno, error) {
-  const panel = document.getElementById('debug-error-panel');
-  const content = document.getElementById('debug-error-content');
-  if (panel && content) {
-    panel.style.display = 'block';
-    content.textContent += `[ERROR] ${message}\n場所: ${source} (Line: ${lineno}, Col: ${colno})\n\n`;
-  }
-  return false;
-};
-
-window.onunhandledrejection = function(event) {
-  const panel = document.getElementById('debug-error-panel');
-  const content = document.getElementById('debug-error-content');
-  if (panel && content) {
-    panel.style.display = 'block';
-    content.textContent += `[Unhandled Rejection] ${event.reason}\n\n`;
-  }
-};
-
 // === アプリケーション状態管理 ===
 let guests = [];
 let selectedGuestId = null;
