@@ -285,65 +285,7 @@ CREATE TABLE IF NOT EXISTS public.realtime_events (
 );
 ALTER TABLE public.realtime_events ADD COLUMN IF NOT EXISTS org_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE;
 
--- 6. 行レベルセキュリティ（RLS）の有効化
-ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.member_profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.books ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.guests ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.realtime_events ENABLE ROW LEVEL SECURITY;
 
--- 7. セキュリティヘルパー関数の定義
-CREATE OR REPLACE FUNCTION public.get_user_org_id()
-RETURNS uuid AS $$
-    SELECT org_id FROM public.member_profiles WHERE id = auth.uid();
-$$ LANGUAGE sql SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION public.get_user_role()
-RETURNS text AS $$
-    SELECT role FROM public.member_profiles WHERE id = auth.uid();
-$$ LANGUAGE sql SECURITY DEFINER;
-
--- 8. RLSポリシーの定義
--- member_profiles
-CREATE POLICY "所属する組織のメンバープロフィールを参照可能" ON public.member_profiles
-    FOR SELECT USING (org_id = public.get_user_org_id());
-
-CREATE POLICY "自分自身のプロフィールは更新可能" ON public.member_profiles
-    FOR UPDATE USING (auth.uid() = id);
-
-CREATE POLICY "自分自身のプロフィールの追加を許可" ON public.member_profiles
-    FOR INSERT WITH CHECK (auth.uid() = id);
-
-CREATE POLICY "マスターはメンバーを管理可能" ON public.member_profiles
-    FOR ALL USING (org_id = public.get_user_org_id() AND public.get_user_role() = 'master');
-
--- organizations
-CREATE POLICY "所属する組織情報のみ参照可能" ON public.organizations
-    FOR SELECT USING (id = public.get_user_org_id());
-
-CREATE POLICY "誰でも組織を作成可能" ON public.organizations
-    FOR INSERT WITH CHECK (true);
-
--- books
-CREATE POLICY "所属組織の手帳のみ参照可能" ON public.books
-    FOR SELECT USING (org_id = public.get_user_org_id());
-
-CREATE POLICY "マスターは手帳を管理可能" ON public.books
-    FOR ALL USING (org_id = public.get_user_org_id() AND public.get_user_role() = 'master');
-
--- guests
-CREATE POLICY "所属組織の手帳の顧客のみ参照可能" ON public.guests
-    FOR SELECT USING (book_id IN (SELECT id FROM public.books WHERE org_id = public.get_user_org_id()));
-
-CREATE POLICY "所属組織の手帳の顧客データを管理可能" ON public.guests
-    FOR ALL USING (book_id IN (SELECT id FROM public.books WHERE org_id = public.get_user_org_id()));
-
--- realtime_events
-CREATE POLICY "所属組織のイベントのみ参照可能" ON public.realtime_events
-    FOR SELECT USING (org_id = public.get_user_org_id());
-
-CREATE POLICY "匿名ユーザーからのイベント挿入を許可" ON public.realtime_events
-    FOR INSERT WITH CHECK (true);
 
 -- 9. リアルタイム配信（レプリケーション）を有効化
 ALTER PUBLICATION supabase_realtime ADD TABLE public.guests;
