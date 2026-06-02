@@ -902,7 +902,14 @@ function setupEventListeners() {
       
       const urlInput = document.getElementById('setup-db-url');
       const keyInput = document.getElementById('setup-db-key');
-      if (urlInput) urlInput.value = url;
+      
+      // URLからProject IDのみを抽出して入力欄にプリセットする
+      let displayUrlOrId = url;
+      if (url && url.startsWith('https://') && url.endsWith('.supabase.co')) {
+        displayUrlOrId = url.replace('https://', '').replace('.supabase.co', '');
+      }
+      
+      if (urlInput) urlInput.value = displayUrlOrId;
       if (keyInput) keyInput.value = key;
       
       closeSettingsModal();
@@ -1044,8 +1051,14 @@ function setupDbWizard() {
   if (form) {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const inputUrl = document.getElementById('setup-db-url').value.trim();
+      let inputUrl = document.getElementById('setup-db-url').value.trim();
       const inputKey = document.getElementById('setup-db-key').value.trim();
+      
+      // Project IDが入力された場合はURL形式に補完
+      if (inputUrl && !inputUrl.startsWith('http://') && !inputUrl.startsWith('https://')) {
+        const cleanId = inputUrl.replace(/[^a-zA-Z0-9]/g, '');
+        inputUrl = `https://${cleanId}.supabase.co`;
+      }
       
       const submitBtn = form.querySelector('button[type="submit"]');
       if (submitBtn) {
