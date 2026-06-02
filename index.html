@@ -293,9 +293,9 @@
         <hr class="settings-divider">
 
         <section class="settings-section">
-          <h4>クラウドDB（Supabase）の再設定</h4>
-          <p>現在保存されているSupabaseの接続設定（URL・APIキー）を消去し、初期設定画面に戻します。</p>
-          <button id="reset-db-btn" class="btn btn-danger">🔒 接続設定をクリアする</button>
+          <h4>クラウドDB（Supabase）の接続設定</h4>
+          <p>SupabaseのProject URLやAPIキーを変更・修正します。（クラウド上のデータは影響を受けません）</p>
+          <button id="edit-db-btn" class="btn btn-secondary">🔑 接続設定を編集する</button>
         </section>
       </div>
     </div>
@@ -309,6 +309,7 @@
     <div class="modal-box glass-panel setup-wizard-box" style="max-width: 520px;">
       <div class="modal-header">
         <h3>✨ 顧客名簿 - クラウドDB初期設定</h3>
+        <button id="db-setup-close" class="close-btn" style="display: none;">&times;</button>
       </div>
       <div class="modal-body">
         <p class="setup-intro" style="font-size: 12px; line-height: 1.6; color: var(--text-secondary); margin-bottom: 15px;">

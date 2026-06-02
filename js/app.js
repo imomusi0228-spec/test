@@ -894,14 +894,28 @@ function setupEventListeners() {
   document.getElementById('import-file-input').addEventListener('change', handleImportFileChange);
   document.getElementById('import-btn').addEventListener('click', importData);
   document.getElementById('demo-data-btn').addEventListener('click', generateDemoData);
-  document.getElementById('reset-db-btn').addEventListener('click', () => {
-    if (confirm('保存されているクラウドDBの接続設定をクリアし、初期設定に戻しますか？')) {
-      localStorage.removeItem('supabase_url');
-      localStorage.removeItem('supabase_key');
-      closeSettingsModal();
-      document.getElementById('db-setup-modal').style.display = 'flex';
-      showToast('接続情報をクリアしました。再設定を行ってください。');
+  document.getElementById('edit-db-btn').addEventListener('click', () => {
+    // 現在の設定値を取得して入力欄にセット
+    const url = localStorage.getItem('supabase_url') || '';
+    const key = localStorage.getItem('supabase_key') || '';
+    document.getElementById('setup-db-url').value = url;
+    document.getElementById('setup-db-key').value = key;
+    
+    // 設定ダイアログを閉じ、初期設定モーダルを開く
+    closeSettingsModal();
+    
+    // 既に設定されている場合は閉じるボタンを表示
+    if (url && key) {
+      document.getElementById('db-setup-close').style.display = 'block';
+    } else {
+      document.getElementById('db-setup-close').style.display = 'none';
     }
+    
+    document.getElementById('db-setup-modal').style.display = 'flex';
+  });
+
+  document.getElementById('db-setup-close').addEventListener('click', () => {
+    document.getElementById('db-setup-modal').style.display = 'none';
   });
   
   // デフォルト日付インプットの初期値
@@ -998,13 +1012,16 @@ async function initSupabase(url, key) {
 function setupDbWizard() {
   const modal = document.getElementById('db-setup-modal');
   const form = document.getElementById('db-setup-form');
+  const closeBtn = document.getElementById('db-setup-close');
   
   const url = localStorage.getItem('supabase_url');
   const key = localStorage.getItem('supabase_key');
   
   if (!url || !key) {
+    closeBtn.style.display = 'none';
     modal.style.display = 'flex';
   } else {
+    closeBtn.style.display = 'block';
     initSupabase(url, key).catch(() => {
       // 起動時初期化に失敗した場合はモーダルを開く
       modal.style.display = 'flex';
