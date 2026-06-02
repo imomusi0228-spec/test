@@ -1,0 +1,1002 @@
+// === アプリケーション状態管理 ===
+let guests = [];
+let selectedGuestId = null;
+let currentTab = '全て';
+let searchQuery = '';
+
+// === 定数 ===
+const STORAGE_KEY = 'vrc_cast_companion_guests';
+const INDEX_TABS = ['全て', 'あ', 'か', 'さ', 'た', 'な', 'は', 'ま', 'や', 'ら', 'わ', 'A-Z', '他'];
+
+// === サンプルデモデータ ===
+const DEMO_GUEST_DATA = [
+  {
+    id: "demo-1",
+    name: "ひな",
+    pronunciation: "ひな",
+    vrcName: "Hina_VRC",
+    xId: "@hina_vrc_cafe",
+    discordId: "hina#9999",
+    firstVisit: "2026-03-01",
+    lastVisit: "2026-06-01",
+    tags: ["常連", "VIP", "甘党"],
+    characteristics: "白猫耳のロリータ系アバター。メロンソーダをいつも注文する。おしゃべり好きで、カフェ系ワールドによくいる。",
+    notes: [
+      { id: "note-1-1", date: "2026-06-01", content: "お嬢のキャスト3周年をお祝いしに来てくれた！シャンパンをあけてくれた。" },
+      { id: "note-1-2", date: "2026-05-15", content: "最近新しいアバターの改変にハマっているらしく、衣装の色変えについて相談された。" },
+      { id: "note-1-3", date: "2026-04-10", content: "初めての来店。最初は緊張していたようだが、共通の趣味（ゲーム）の話で盛り上がった。" }
+    ]
+  },
+  {
+    id: "demo-2",
+    name: "クロウ",
+    pronunciation: "くろう",
+    vrcName: "Crow_Black",
+    xId: "@crow_vrc_dj",
+    discordId: "crow_dj",
+    firstVisit: "2026-04-05",
+    lastVisit: "2026-05-28",
+    tags: ["準常連", "DJ", "お酒好き"],
+    characteristics: "黒髪のスタイリッシュなイケメンアバター。クラブ系ワールドのDJをやっている。ハイボールが好き。",
+    notes: [
+      { id: "note-2-1", date: "2026-05-28", content: "DJイベントの告知をしてくれた。来週の土曜日にイベントを回すらしい。お嬢も誘われた。" },
+      { id: "note-2-2", date: "2026-04-20", content: "音楽の好みについて雑談。クラブミュージック（特にTech House）に詳しい。" }
+    ]
+  },
+  {
+    id: "demo-3",
+    name: "Alice",
+    pronunciation: "ありす",
+    vrcName: "Alice_In_VRC",
+    xId: "@alice_wonder",
+    discordId: "alice_vrc",
+    firstVisit: "2026-05-10",
+    lastVisit: "2026-05-10",
+    tags: ["新規", "英語OK"],
+    characteristics: "金髪アリスアバター。海外プレイヤー。日本語は日常会話レベルなら通じる。抹茶のお菓子が好き。",
+    notes: [
+      { id: "note-3-1", date: "2026-05-10", content: "新規で来店。フレンドの紹介で来てくれた。アバターのギミックがとても綺麗で、見せてもらった。" }
+    ]
+  }
+];
+
+// === 起動時の初期化処理 ===
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadData();
+  setupIndexTabs();
+  setupEventListeners();
+  renderGuestList();
+  updateTotalCount();
+  setupSSE();
+  
+  // 初回起動時かつデータが空の場合、デモデータを投入
+  if (guests.length === 0) {
+    guests = [...DEMO_GUEST_DATA];
+    await saveData();
+    renderGuestList();
+    updateTotalCount();
+    showToast("サンプル用のデモデータを登録しました！");
+  }
+});
+
+// === データ保存・読み込み ===
+async function loadData() {
+  try {
+    const response = await fetch('/api/guests');
+    if (response.ok) {
+      guests = await response.json();
+      guests.forEach(g => {
+        if (!g.notes) g.notes = [];
+        if (!g.tags) g.tags = [];
+        if (g.visitCount === undefined) g.visitCount = 1;
+      });
+    } else {
+      throw new Error('Server response not OK');
+    }
+  } catch (e) {
+    console.warn("[Storage] サーバーからのデータ取得に失敗しました。ローカルストレージを使用します。", e);
+    const data = localStorage.getItem(STORAGE_KEY);
+    if (data) {
+      try {
+        guests = JSON.parse(data);
+        guests.forEach(g => {
+          if (!g.notes) g.notes = [];
+          if (!g.tags) g.tags = [];
+          if (g.visitCount === undefined) g.visitCount = 1;
+        });
+      } catch (err) {
+        guests = [];
+      }
+    } else {
+      guests = [];
+    }
+  }
+}
+
+async function saveData() {
+  updateTotalCount();
+  
+  // サーバーに送信
+  try {
+    const response = await fetch('/api/guests', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(guests)
+    });
+    if (!response.ok) throw new Error('Server POST failed');
+  } catch (e) {
+    console.error("[Storage] サーバーへのデータ保存に失敗しました。", e);
+  }
+  
+  // ローカルフォールバック保存
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(guests));
+}
+
+// === インデックスタブの生成と判定 ===
+function setupIndexTabs() {
+  const container = document.getElementById('book-tabs');
+  container.innerHTML = '';
+  
+  INDEX_TABS.forEach(tabName => {
+    const tab = document.createElement('div');
+    tab.className = `index-tab ${tabName === currentTab ? 'active' : ''}`;
+    tab.textContent = tabName;
+    tab.dataset.tab = tabName;
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.index-tab').forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      currentTab = tabName;
+      renderGuestList();
+    });
+    container.appendChild(tab);
+  });
+}
+
+// 日本語のインデックス判定
+function getIndexGroup(pronunciation, name) {
+  const text = (pronunciation || name || "").trim();
+  if (!text) return "他";
+  
+  const firstChar = text.charAt(0);
+  
+  // カタカナをひらがなに変換する簡易テーブル
+  const hiraChar = katakanaToHiragana(firstChar);
+  
+  const isBetween = (char, start, end) => char >= start && char <= end;
+  
+  if (isBetween(hiraChar, 'ぁ', 'お')) return 'あ';
+  if (isBetween(hiraChar, 'か', 'ご')) return 'か';
+  if (isBetween(hiraChar, 'さ', 'ぞ')) return 'さ';
+  if (isBetween(hiraChar, 'た', 'ど')) return 'た';
+  if (isBetween(hiraChar, 'な', 'の')) return 'な';
+  if (isBetween(hiraChar, 'は', 'ぽ')) return 'は';
+  if (isBetween(hiraChar, 'ま', 'も')) return 'ま';
+  if (isBetween(hiraChar, 'や', 'よ')) return 'や';
+  if (isBetween(hiraChar, 'ら', 'ろ')) return 'ら';
+  if (isBetween(hiraChar, 'わ', 'ん') || hiraChar === 'を') return 'わ';
+  
+  // アルファベット
+  if (/^[A-Za-z]/.test(firstChar)) return 'A-Z';
+  
+  return '他';
+}
+
+function katakanaToHiragana(src) {
+  return src.replace(/[\u30a1-\u30f6]/g, function(match) {
+    var chr = match.charCodeAt(0) - 0x60;
+    return String.fromCharCode(chr);
+  });
+}
+
+// === リストのレンダリング ===
+function renderGuestList() {
+  const listContainer = document.getElementById('guest-list');
+  const noResults = document.getElementById('no-results');
+  listContainer.innerHTML = '';
+  
+  // フィルタリング処理
+  let filtered = guests.filter(guest => {
+    // 検索クエリでのフィルター
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const nameMatch = guest.name.toLowerCase().includes(query);
+      const pronMatch = (guest.pronunciation || "").toLowerCase().includes(query);
+      const vrcMatch = (guest.vrcName || "").toLowerCase().includes(query);
+      const charMatch = (guest.characteristics || "").toLowerCase().includes(query);
+      const tagMatch = guest.tags.some(tag => tag.toLowerCase().includes(query));
+      
+      if (!nameMatch && !pronMatch && !vrcMatch && !charMatch && !tagMatch) {
+        return false;
+      }
+    }
+    
+    // インデックスタブでのフィルター
+    if (currentTab !== '全て') {
+      const group = getIndexGroup(guest.pronunciation, guest.name);
+      if (group !== currentTab) {
+        return false;
+      }
+    }
+    
+    return true;
+  });
+  
+  // 名前順（ひらがな優先）でソート
+  filtered.sort((a, b) => {
+    const keyA = a.pronunciation || a.name;
+    const keyB = b.pronunciation || b.name;
+    return keyA.localeCompare(keyB, 'ja');
+  });
+
+  if (filtered.length === 0) {
+    noResults.style.display = 'block';
+  } else {
+    noResults.style.display = 'none';
+  }
+  
+  filtered.forEach(guest => {
+    const card = document.createElement('div');
+    card.className = `guest-card ${guest.id === selectedGuestId ? 'active' : ''}`;
+    card.dataset.id = guest.id;
+    
+    const initial = guest.name ? guest.name.charAt(0).toUpperCase() : 'G';
+    const lastVisitText = guest.lastVisit ? guest.lastVisit.replace(/-/g, '/') : '未設定';
+    
+    // タグのHTML生成
+    const tagsHTML = guest.tags.slice(0, 3).map(tag => {
+      let extraClass = '';
+      if (tag === 'VIP') extraClass = 'tag-vip';
+      else if (tag === '常連' || tag === '準常連') extraClass = 'tag-regular';
+      return `<span class="mini-tag ${extraClass}">${escapeHTML(tag)}</span>`;
+    }).join('');
+    
+    card.innerHTML = `
+      <div class="guest-card-avatar">${escapeHTML(initial)}</div>
+      <div class="guest-card-info">
+        <div class="guest-card-name-row">
+          <span class="guest-card-name">${escapeHTML(guest.name)}</span>
+          <span class="guest-card-last-visit">${escapeHTML(lastVisitText)}</span>
+        </div>
+        <div class="guest-card-tags">
+          ${tagsHTML}
+        </div>
+      </div>
+    `;
+    
+    card.addEventListener('click', () => selectGuest(guest.id));
+    listContainer.appendChild(card);
+  });
+}
+
+// === 顧客の選択と詳細表示 ===
+function selectGuest(id) {
+  selectedGuestId = id;
+  
+  // アクティブカードの表示切り替え
+  document.querySelectorAll('.guest-card').forEach(card => {
+    if (card.dataset.id === id) {
+      card.classList.add('active');
+    } else {
+      card.classList.remove('active');
+    }
+  });
+  
+  const guest = guests.find(g => g.id === id);
+  if (!guest) return;
+  
+  // UIの要素を更新
+  document.getElementById('no-selection-placeholder').style.display = 'none';
+  document.getElementById('detail-content').style.display = 'block';
+  
+  document.getElementById('detail-name').textContent = guest.name;
+  document.getElementById('detail-pronunciation').textContent = guest.pronunciation ? `（${guest.pronunciation}）` : '';
+  document.getElementById('detail-vrc-name').textContent = guest.vrcName ? `@${guest.vrcName}` : '@未登録';
+  
+  const initial = guest.name ? guest.name.charAt(0).toUpperCase() : 'G';
+  document.getElementById('detail-avatar').textContent = initial;
+  
+  // SNS/連絡先
+  document.getElementById('detail-x-id').textContent = guest.xId || '未登録';
+  document.getElementById('detail-discord-id').textContent = guest.discordId || '未登録';
+  
+  // 来店日
+  document.getElementById('detail-first-visit').textContent = guest.firstVisit ? guest.firstVisit.replace(/-/g, '/') : '未登録';
+  document.getElementById('detail-last-visit').textContent = guest.lastVisit ? guest.lastVisit.replace(/-/g, '/') : '未登録';
+  document.getElementById('detail-visit-count').textContent = `${guest.visitCount || 1}回`;
+  
+  // 特徴
+  document.getElementById('detail-characteristics').textContent = guest.characteristics || '特徴・好みの情報はまだ登録されていません。';
+  
+  // タグ
+  const tagsContainer = document.getElementById('detail-tags');
+  tagsContainer.innerHTML = '';
+  if (guest.tags && guest.tags.length > 0) {
+    guest.tags.forEach(tag => {
+      const span = document.createElement('span');
+      let extraClass = '';
+      if (tag === 'VIP') extraClass = 'tag-vip';
+      else if (tag === '常連' || tag === '準常連') extraClass = 'tag-regular';
+      span.className = `tag ${extraClass}`;
+      span.textContent = tag;
+      tagsContainer.appendChild(span);
+    });
+  } else {
+    tagsContainer.innerHTML = '<span style="font-size: 11px; color: var(--text-muted);">タグなし</span>';
+  }
+  
+  // タイムライン
+  renderTimeline(guest.notes);
+}
+
+function renderTimeline(notes) {
+  const timeline = document.getElementById('notes-timeline');
+  timeline.innerHTML = '';
+  
+  if (!notes || notes.length === 0) {
+    timeline.innerHTML = '<p style="font-size: 12px; color: var(--text-muted); padding: 10px 0;">まだ会話履歴はありません。</p>';
+    return;
+  }
+  
+  // 日付の降順（新しい順）で並び替え
+  const sortedNotes = [...notes].sort((a, b) => b.date.localeCompare(a.date));
+  
+  sortedNotes.forEach(note => {
+    const item = document.createElement('div');
+    item.className = 'timeline-item';
+    
+    const dateText = note.date ? note.date.replace(/-/g, '/') : '日付不明';
+    
+    item.innerHTML = `
+      <div class="timeline-card">
+        <div class="timeline-header">
+          <span class="timeline-date">${escapeHTML(dateText)}</span>
+          <button class="delete-note-btn" data-note-id="${note.id}">削除</button>
+        </div>
+        <div class="timeline-content">${escapeHTML(note.content)}</div>
+      </div>
+    `;
+    
+    // メモ削除イベント
+    item.querySelector('.delete-note-btn').addEventListener('click', (e) => {
+      const noteId = e.target.dataset.noteId;
+      if (confirm('このメモを削除してもいいかい？')) {
+        deleteNote(noteId);
+      }
+    });
+    
+    timeline.appendChild(item);
+  });
+}
+
+// === メモの追加・削除 ===
+function addNote() {
+  if (!selectedGuestId) return;
+  const input = document.getElementById('new-note-input');
+  const dateInput = document.getElementById('new-note-date');
+  
+  const content = input.value.trim();
+  const date = dateInput.value || getTodayDateString();
+  
+  if (!content) {
+    showToast("メモの内容を入力しておくれ");
+    return;
+  }
+  
+  const guestIndex = guests.findIndex(g => g.id === selectedGuestId);
+  if (guestIndex === -1) return;
+  
+  const newNote = {
+    id: 'note-' + Date.now(),
+    date: date,
+    content: content
+  };
+  
+  if (!guests[guestIndex].notes) {
+    guests[guestIndex].notes = [];
+  }
+  
+  guests[guestIndex].notes.push(newNote);
+  
+  // ついでに最終来店日もこのメモの日付にアップデートする（メモの日付の方が新しい場合のみ、または未設定の場合）
+  if (!guests[guestIndex].lastVisit || date > guests[guestIndex].lastVisit) {
+    guests[guestIndex].lastVisit = date;
+  }
+  
+  saveGuest(guests[guestIndex]);
+  input.value = '';
+  
+  // 表示の更新
+  selectGuest(selectedGuestId);
+  renderGuestList();
+  showToast("メモを追加したよ");
+}
+
+function deleteNote(noteId) {
+  if (!selectedGuestId) return;
+  
+  const guestIndex = guests.findIndex(g => g.id === selectedGuestId);
+  if (guestIndex === -1) return;
+  
+  guests[guestIndex].notes = guests[guestIndex].notes.filter(n => n.id !== noteId);
+  
+  saveGuest(guests[guestIndex]);
+  selectGuest(selectedGuestId);
+  showToast("メモを削除したよ");
+}
+
+// === 顧客の登録・編集モーダル ===
+function openGuestModal(guestId = null) {
+  const modal = document.getElementById('guest-modal');
+  const form = document.getElementById('guest-form');
+  const title = document.getElementById('modal-title');
+  
+  form.reset();
+  document.getElementById('edit-guest-id').value = '';
+  document.getElementById('suggested-tags').textContent = getAllUniqueTags().join(', ') || 'なし';
+  
+  if (guestId) {
+    title.textContent = "顧客プロファイルの編集";
+    const guest = guests.find(g => g.id === guestId);
+    if (guest) {
+      document.getElementById('edit-guest-id').value = guest.id;
+      document.getElementById('form-name').value = guest.name || '';
+      document.getElementById('form-pronunciation').value = guest.pronunciation || '';
+      document.getElementById('form-vrc-name').value = guest.vrcName || '';
+      document.getElementById('form-x-id').value = guest.xId || '';
+      document.getElementById('form-discord-id').value = guest.discordId || '';
+      document.getElementById('form-first-visit').value = guest.firstVisit || '';
+      document.getElementById('form-last-visit').value = guest.lastVisit || '';
+      document.getElementById('form-visit-count').value = guest.visitCount || 1;
+      document.getElementById('form-tags').value = (guest.tags || []).join(', ');
+      document.getElementById('form-characteristics').value = guest.characteristics || '';
+    }
+  } else {
+    title.textContent = "新規顧客登録";
+    // デフォルト日付を今日にする
+    document.getElementById('form-first-visit').value = getTodayDateString();
+    document.getElementById('form-last-visit').value = getTodayDateString();
+    document.getElementById('form-visit-count').value = 1;
+  }
+  
+  modal.style.display = 'flex';
+}
+
+function closeGuestModal() {
+  document.getElementById('guest-modal').style.display = 'none';
+}
+
+async function handleGuestFormSubmit(e) {
+  e.preventDefault();
+  
+  const id = document.getElementById('edit-guest-id').value;
+  const name = document.getElementById('form-name').value.trim();
+  const pronunciation = document.getElementById('form-pronunciation').value.trim();
+  const vrcName = document.getElementById('form-vrc-name').value.trim();
+  const xId = document.getElementById('form-x-id').value.trim();
+  const discordId = document.getElementById('form-discord-id').value.trim();
+  const firstVisit = document.getElementById('form-first-visit').value;
+  const lastVisit = document.getElementById('form-last-visit').value;
+  const visitCount = parseInt(document.getElementById('form-visit-count').value, 10) || 1;
+  const characteristics = document.getElementById('form-characteristics').value.trim();
+  
+  // タグ文字列のパース (カンマまたはスペース区切り)
+  const tagsRaw = document.getElementById('form-tags').value;
+  const tags = tagsRaw.split(/[,，\s]+/)
+    .map(t => t.trim())
+    .filter(t => t.length > 0);
+    
+  if (id) {
+    // 既存の編集
+    const index = guests.findIndex(g => g.id === id);
+    if (index !== -1) {
+      guests[index] = {
+        ...guests[index],
+        name,
+        pronunciation,
+        vrcName,
+        xId,
+        discordId,
+        firstVisit,
+        lastVisit,
+        visitCount,
+        tags,
+        characteristics
+      };
+      await saveData();
+      showToast("顧客情報を更新したよ");
+    }
+  } else {
+    // 新規追加
+    const newGuest = {
+      id: 'guest-' + Date.now(),
+      name,
+      pronunciation,
+      vrcName,
+      xId,
+      discordId,
+      firstVisit,
+      lastVisit,
+      visitCount,
+      tags,
+      characteristics,
+      notes: []
+    };
+    guests.push(newGuest);
+    saveGuest(newGuest);
+    selectedGuestId = newGuest.id; // 新規追加した人を自動選択
+    showToast("新しく顧客を魔導書に加えたよ");
+  }
+  
+  closeGuestModal();
+  renderGuestList();
+  if (selectedGuestId) {
+    selectGuest(selectedGuestId);
+  }
+}
+
+async function deleteGuest(id) {
+  if (!confirm("本当にこの顧客を削除するかい？メモや会話履歴もすべて消えてしまうよ。")) {
+    return;
+  }
+  
+  guests = guests.filter(g => g.id !== id);
+  if (supabase) {
+    try {
+      await supabase.from('guests').delete().eq('id', id);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(guests));
+  
+  selectedGuestId = null;
+  document.getElementById('no-selection-placeholder').style.display = 'flex';
+  document.getElementById('detail-content').style.display = 'none';
+  
+  renderGuestList();
+  showToast("顧客を魔導書から削除したよ");
+}
+
+// === データ管理（インポート/エクスポート） ===
+function openSettingsModal() {
+  document.getElementById('settings-modal').style.display = 'flex';
+  document.getElementById('selected-file-name').textContent = "選択されていません";
+  document.getElementById('import-btn').disabled = true;
+  document.getElementById('import-file-input').value = '';
+}
+
+function closeSettingsModal() {
+  document.getElementById('settings-modal').style.display = 'none';
+}
+
+function exportData() {
+  const jsonString = JSON.stringify(guests, null, 2);
+  const blob = new Blob([jsonString], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  
+  const a = document.createElement('a');
+  const dateStr = getTodayDateString().replace(/-/g, '');
+  a.href = url;
+  a.download = `vrc_cast_companion_backup_${dateStr}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  
+  showToast("データをJSONファイルでエクスポートしたよ！");
+}
+
+function exportSingleGuest(guestId) {
+  const guest = guests.find(g => g.id === guestId);
+  if (!guest) return;
+  
+  let txt = `=========================================\n`;
+  txt += ` VRC CAST COMPANION - GUEST CARD\n`;
+  txt += `=========================================\n`;
+  txt += `【名前】 ${guest.name}`;
+  if (guest.pronunciation) txt += ` (${guest.pronunciation})`;
+  txt += `\n`;
+  if (guest.vrcName) txt += `【VRChat ID】 @${guest.vrcName}\n`;
+  if (guest.xId) txt += `【X (Twitter)】 ${guest.xId}\n`;
+  if (guest.discordId) txt += `【Discord】 ${guest.discordId}\n`;
+  txt += `-----------------------------------------\n`;
+  txt += `【初回来店日】 ${guest.firstVisit ? guest.firstVisit.replace(/-/g, '/') : '未設定'}\n`;
+  txt += `【最終来店日】 ${guest.lastVisit ? guest.lastVisit.replace(/-/g, '/') : '未設定'}\n`;
+  txt += `【タグ】 ${(guest.tags || []).join(', ') || 'なし'}\n`;
+  txt += `-----------------------------------------\n`;
+  txt += `【特徴・好み】\n${guest.characteristics || '未設定'}\n`;
+  txt += `-----------------------------------------\n`;
+  txt += `【会話履歴・メモ】\n`;
+  
+  if (guest.notes && guest.notes.length > 0) {
+    const sortedNotes = [...guest.notes].sort((a, b) => b.date.localeCompare(a.date));
+    sortedNotes.forEach(note => {
+      txt += `[${note.date.replace(/-/g, '/')}]\n${note.content}\n\n`;
+    });
+  } else {
+    txt += `履歴なし\n`;
+  }
+  txt += `=========================================\n`;
+
+  const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `guest_${guest.name}_card.txt`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  
+  showToast(`${guest.name} のページを抜き出して保存したよ！`);
+}
+
+function triggerImportFile() {
+  document.getElementById('import-file-input').click();
+}
+
+function handleImportFileChange(e) {
+  const file = e.target.files[0];
+  const label = document.getElementById('selected-file-name');
+  const importBtn = document.getElementById('import-btn');
+  
+  if (file) {
+    label.textContent = file.name;
+    importBtn.disabled = false;
+  } else {
+    label.textContent = "選択されていません";
+    importBtn.disabled = true;
+  }
+}
+
+function importData() {
+  const fileInput = document.getElementById('import-file-input');
+  const file = fileInput.files[0];
+  if (!file) return;
+  
+  if (!confirm("現在のデータはすべて上書きされるけど、本当に復元していいかい？")) {
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const importedData = JSON.parse(e.target.result);
+      if (Array.isArray(importedData)) {
+        // 最低限のデータ構造バリデーション
+        const isValid = importedData.every(item => item && typeof item.name === 'string');
+        if (isValid) {
+          guests = importedData.map(item => ({
+            id: item.id || ('guest-' + Date.now() + Math.random().toString(36).substr(2, 5)),
+            name: item.name,
+            pronunciation: item.pronunciation || '',
+            vrcName: item.vrcName || '',
+            xId: item.xId || '',
+            discordId: item.discordId || '',
+            firstVisit: item.firstVisit || '',
+            lastVisit: item.lastVisit || '',
+            tags: item.tags || [],
+            characteristics: item.characteristics || '',
+            notes: item.notes || []
+          }));
+          saveData();
+          selectedGuestId = null;
+          document.getElementById('no-selection-placeholder').style.display = 'flex';
+          document.getElementById('detail-content').style.display = 'none';
+          
+          renderGuestList();
+          closeSettingsModal();
+          showToast("データを正常に復元したよ！");
+        } else {
+          alert("ファイルのフォーマットが正しくありません。");
+        }
+      } else {
+        alert("ファイル内容が配列ではありません。");
+      }
+    } catch (err) {
+      alert("ファイルの解析に失敗しました。正しいJSONファイルか確認してください。");
+      console.error(err);
+    }
+  };
+  reader.readAsText(file);
+}
+
+function generateDemoData() {
+  // 既存のIDと重複しないようにデモデータをマージ
+  const newDemoData = DEMO_GUEST_DATA.filter(demo => !guests.some(g => g.vrcName === demo.vrcName));
+  if (newDemoData.length === 0) {
+    showToast("デモデータはすでにすべて登録されているよ");
+    return;
+  }
+  
+  guests = [...guests, ...newDemoData.map(d => ({...d, id: 'guest-demo-' + Date.now() + Math.random().toString(36).substring(2, 4)}))];
+  saveData();
+  renderGuestList();
+  closeSettingsModal();
+  showToast("デモデータを追加したよ！");
+}
+
+// === イベントリスナー紐付け ===
+function setupEventListeners() {
+  // 検索入力
+  const searchInput = document.getElementById('search-input');
+  const clearSearch = document.getElementById('clear-search');
+  
+  searchInput.addEventListener('input', (e) => {
+    searchQuery = e.target.value;
+    if (searchQuery) {
+      clearSearch.style.display = 'block';
+    } else {
+      clearSearch.style.display = 'none';
+    }
+    renderGuestList();
+  });
+  
+  clearSearch.addEventListener('click', () => {
+    searchInput.value = '';
+    searchQuery = '';
+    clearSearch.style.display = 'none';
+    renderGuestList();
+    searchInput.focus();
+  });
+  
+  // キーボードショートカット (Ctrl+K or Cmd+K) で検索フォーカス
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      searchInput.focus();
+    }
+    // ESCで検索クリア & フォーカスアウト
+    if (e.key === 'Escape' && document.activeElement === searchInput) {
+      searchInput.blur();
+    }
+  });
+  
+  // 新規登録ボタン
+  document.getElementById('add-guest-btn').addEventListener('click', () => openGuestModal());
+  
+  // モーダルクローズ
+  document.getElementById('modal-close').addEventListener('click', closeGuestModal);
+  document.getElementById('modal-cancel').addEventListener('click', closeGuestModal);
+  
+  // モーダル枠外クリックで閉じる
+  window.addEventListener('click', (e) => {
+    const guestModal = document.getElementById('guest-modal');
+    const settingsModal = document.getElementById('settings-modal');
+    if (e.target === guestModal) closeGuestModal();
+    if (e.target === settingsModal) closeSettingsModal();
+  });
+  
+  // フォーム送信
+  document.getElementById('guest-form').addEventListener('submit', handleGuestFormSubmit);
+  
+  // 右ページ編集・削除・抜き出し
+  document.getElementById('export-single-guest-btn').addEventListener('click', () => {
+    if (selectedGuestId) exportSingleGuest(selectedGuestId);
+  });
+  document.getElementById('edit-guest-btn').addEventListener('click', () => {
+    if (selectedGuestId) openGuestModal(selectedGuestId);
+  });
+  document.getElementById('delete-guest-btn').addEventListener('click', () => {
+    if (selectedGuestId) deleteGuest(selectedGuestId);
+  });
+  
+  // メモ追加
+  document.getElementById('add-note-btn').addEventListener('click', addNote);
+  document.getElementById('new-note-input').addEventListener('keydown', (e) => {
+    // Ctrl + Enter でメモ送信
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      addNote();
+    }
+  });
+  
+  // 設定関連
+  document.getElementById('settings-btn').addEventListener('click', openSettingsModal);
+  document.getElementById('settings-close').addEventListener('click', closeSettingsModal);
+  document.getElementById('export-btn').addEventListener('click', exportData);
+  document.getElementById('import-trigger-btn').addEventListener('click', triggerImportFile);
+  document.getElementById('import-file-input').addEventListener('change', handleImportFileChange);
+  document.getElementById('import-btn').addEventListener('click', importData);
+  document.getElementById('demo-data-btn').addEventListener('click', generateDemoData);
+  
+  // デフォルト日付インプットの初期値
+  document.getElementById('new-note-date').value = getTodayDateString();
+}
+
+// === ヘルパーユーティリティ ===
+function getTodayDateString() {
+  const today = new Date();
+  const yyyy = today.getFullYear();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function updateTotalCount() {
+  document.getElementById('total-guests-count').textContent = guests.length;
+}
+
+function getAllUniqueTags() {
+  const allTags = [];
+  guests.forEach(g => {
+    if (g.tags) {
+      g.tags.forEach(tag => {
+        if (!allTags.includes(tag)) {
+          allTags.push(tag);
+        }
+      });
+    }
+  });
+  return allTags;
+}
+
+function showToast(message) {
+  const toast = document.getElementById('toast');
+  
+  // 既存のトーストアニメーションがあれば一度消す
+  toast.style.display = 'none';
+  // 強制リフローさせてアニメーションを初期化
+  void toast.offsetWidth;
+  
+  toast.textContent = message;
+  toast.style.display = 'block';
+  
+  // 3秒後に非表示にする
+  setTimeout(() => {
+    toast.style.display = 'none';
+  }, 3000);
+}
+
+function escapeHTML(str) {
+  if (typeof str !== 'string') return str;
+  return str.replace(/[&<>'"]/g, 
+    tag => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;'
+    }[tag] || tag)
+  );
+}
+
+// === データベース初期設定ウィザード ===
+function setupDbWizard() {
+  const modal = document.getElementById('db-setup-modal');
+  const form = document.getElementById('db-setup-form');
+  
+  const url = localStorage.getItem('supabase_url');
+  const key = localStorage.getItem('supabase_key');
+  
+  if (!url || !key) {
+    modal.style.display = 'flex';
+  } else {
+    initSupabase(url, key);
+  }
+  
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const inputUrl = document.getElementById('setup-db-url').value.trim();
+    const inputKey = document.getElementById('setup-db-key').value.trim();
+    
+    const submitBtn = form.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = "接続確認中...";
+    
+    try {
+      // 接続テスト
+      const tempClient = window.supabase.createClient(inputUrl, inputKey);
+      const { error } = await tempClient.from('guests').select('count', { count: 'exact', head: true });
+      if (error) throw error;
+      
+      localStorage.setItem('supabase_url', inputUrl);
+      localStorage.setItem('supabase_key', inputKey);
+      modal.style.display = 'none';
+      showToast("クラウドDBへの接続に成功しました！");
+      
+      initSupabase(inputUrl, inputKey);
+    } catch (err) {
+      console.error(err);
+      alert("データベースに接続できませんでした。以下の原因が考えられます：\n\n1. URLかanon keyが間違っている\n2. SQL Editorでテーブル作成用クエリを実行していない\n\nエラー詳細: " + err.message);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "接続して魔導書を展開する 🔮";
+    }
+  });
+}
+
+// === Supabase リアルタイム同期連携 ===
+function setupSupabaseRealtime() {
+  if (!supabase) return;
+  
+  // guests テーブルの変更検知（他ブラウザからの追加・編集をリアルタイム受信）
+  supabase
+    .channel('db-guests-channel')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'guests' }, async () => {
+      await loadData();
+      renderGuestList();
+      if (selectedGuestId) {
+        selectGuest(selectedGuestId);
+      }
+    })
+    .subscribe();
+    
+  // realtime_events テーブルの検知（ローカル監視スクリプトやUdonからの通知）
+  supabase
+    .channel('db-events-channel')
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'realtime_events' }, payload => {
+      const newEvent = payload.new;
+      if (newEvent.type === 'player-join') {
+        handlePlayerJoinEvent(newEvent.player_name);
+      } else if (newEvent.type === 'guestbook-register') {
+        // 芳名帳記名通知
+        handleGuestbookRegisterEvent(newEvent.player_name, newEvent.comment, newEvent.visit_count);
+      }
+    })
+    .subscribe();
+}
+
+function handlePlayerJoinEvent(playerName) {
+  const nameLower = playerName.toLowerCase();
+  
+  // 登録メンバー照合
+  const foundGuest = guests.find(g => 
+    (g.name && g.name.toLowerCase() === nameLower) ||
+    (g.pronunciation && g.pronunciation.toLowerCase() === nameLower) ||
+    (g.vrcName && g.vrcName.toLowerCase() === nameLower)
+  );
+  
+  if (foundGuest) {
+    selectGuest(foundGuest.id);
+    showToast(`✨ ${foundGuest.name} がインスタンスに入室しました。カルテを開きます。`);
+  } else {
+    const escapedName = escapeHTML(playerName).replace(/'/g, "\\'");
+    showToastWithAction(
+      `👤 未登録の「${escapeHTML(playerName)}」が入室しました。`,
+      `登録する`,
+      `window.quickRegisterGuest('${escapedName}')`
+    );
+  }
+}
+
+async function handleGuestbookRegisterEvent(playerName, comment, visitCount) {
+  await loadData();
+  renderGuestList();
+  
+  // 記名されたゲストを検索
+  const nameLower = playerName.toLowerCase();
+  const guest = guests.find(g => 
+    (g.name && g.name.toLowerCase() === nameLower) ||
+    (g.vrcName && g.vrcName.toLowerCase() === nameLower)
+  );
+  
+  if (guest) {
+    selectedGuestId = guest.id;
+    selectGuest(guest.id);
+  }
+  
+  let msg = `📖 芳名帳に「${escapeHTML(playerName)}」さんが記名しました！(来店:${visitCount || 1}回目)`;
+  if (comment) {
+    msg += ` ↳ "${escapeHTML(comment)}"`;
+  }
+  showToast(msg);
+}
+
+function showToastWithAction(message, actionLabel, actionJS) {
+  const toast = document.getElementById('toast');
+  toast.style.display = 'none';
+  void toast.offsetWidth; // リフロー
+  
+  toast.innerHTML = `${message} <button class="btn btn-primary btn-sm" style="margin-left: 10px; padding: 4px 8px; font-size: 10px; box-shadow: var(--glow-cyan);" onclick="${actionJS}">${actionLabel}</button>`;
+  toast.style.display = 'block';
+}
+
+// クイック追加アクション
+window.quickRegisterGuest = function(name) {
+  openGuestModal();
+  document.getElementById('form-name').value = name;
+  document.getElementById('form-vrc-name').value = name;
+  document.getElementById('toast').style.display = 'none';
+};

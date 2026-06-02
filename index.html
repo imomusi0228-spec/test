@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VRC Cast Companion - 顧客魔導書</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <!-- Supabase JS Client CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <!-- 背景のネオン発光グラデーション -->
+  <div class="ambient-glow bg-glow-1"></div>
+  <div class="ambient-glow bg-glow-2"></div>
+
+  <div class="app-container">
+    <!-- メインの魔導書コンテナ -->
+    <main class="book-container">
+      <div class="book">
+        
+        <!-- 左ページ：顧客インデックス・検索 -->
+        <section class="page left-page">
+          <div class="page-content">
+            <header class="page-header">
+              <div class="logo-area">
+                <span class="logo-icon">📖</span>
+                <h1 class="app-title">VRC Cast Companion</h1>
+              </div>
+              <p class="subtitle">お嬢の顧客魔導書へようこそ</p>
+            </header>
+
+            <!-- 検索 & アクションバー -->
+            <div class="search-actions">
+              <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="search-input" placeholder="名前・特徴・タグで検索... (Ctrl+K)" autocomplete="off">
+                <button id="clear-search" class="clear-btn" style="display: none;">×</button>
+              </div>
+              <button id="add-guest-btn" class="btn btn-primary">
+                <span class="btn-icon">＋</span>新規登録
+              </button>
+            </div>
+
+            <!-- 顧客リストエリア -->
+            <div class="guest-list-container">
+              <div id="guest-list" class="guest-list">
+                <!-- JavaScriptで動的に生成される -->
+              </div>
+              <div id="no-results" class="no-results" style="display: none;">
+                <p>該当するキャストは見つかりませんでした</p>
+              </div>
+            </div>
+
+            <!-- 左ページフッター：ステータス & 設定 -->
+            <footer class="page-footer">
+              <div class="stats">
+                登録数: <span id="total-guests-count">0</span>名
+              </div>
+              <div class="footer-actions">
+                <button id="settings-btn" class="btn btn-icon-only" title="データ管理">⚙️</button>
+              </div>
+            </footer>
+          </div>
+        </section>
+
+        <!-- 本の背表紙（セパレーター） -->
+        <div class="book-spine">
+          <div class="spine-line"></div>
+          <div class="spine-rings">
+            <div class="ring"></div>
+            <div class="ring"></div>
+            <div class="ring"></div>
+            <div class="ring"></div>
+            <div class="ring"></div>
+          </div>
+        </div>
+
+        <!-- 右ページ：顧客カルテ（詳細表示・編集） -->
+        <section class="page right-page" id="detail-page">
+          <!-- 未選択時のプレースホルダー -->
+          <div id="no-selection-placeholder" class="placeholder-content">
+            <div class="placeholder-icon">🔮</div>
+            <h3>名簿を開いてください</h3>
+            <p>左側のリストからキャストを選択するか、新規登録を行ってください。</p>
+          </div>
+
+          <!-- 顧客詳細コンテンツ（通常非表示、選択時に表示） -->
+          <div id="detail-content" class="page-content" style="display: none;">
+            <div class="detail-scroll-container">
+              <!-- プロフィールヘッダー -->
+              <header class="detail-header">
+                <div class="profile-avatar-row">
+                  <div class="avatar-container">
+                    <div id="detail-avatar" class="avatar-fallback">G</div>
+                  </div>
+                  <div class="profile-names">
+                    <div class="name-edit-row">
+                      <h2 id="detail-name">ゲスト名</h2>
+                      <span id="detail-pronunciation" class="pronunciation">（かな）</span>
+                    </div>
+                    <p id="detail-vrc-name" class="vrc-username">@vrc_username</p>
+                  </div>
+                  <div class="detail-header-actions">
+                    <button id="export-single-guest-btn" class="btn btn-secondary" title="このページをテキストとして抜き出す">📄 抜き出し</button>
+                    <button id="edit-guest-btn" class="btn btn-secondary">編集</button>
+                    <button id="delete-guest-btn" class="btn btn-danger-icon" title="削除">🗑️</button>
+                  </div>
+                </div>
+
+                <!-- SNS / 連絡先リンク -->
+                <div class="social-links">
+                  <div id="link-x" class="social-badge">
+                    <span class="social-icon">𝕏</span>
+                    <span id="detail-x-id" class="social-text">未登録</span>
+                  </div>
+                  <div id="link-discord" class="social-badge">
+                    <span class="social-icon">💬</span>
+                    <span id="detail-discord-id" class="social-text">未登録</span>
+                  </div>
+                </div>
+
+                <!-- タグ一覧 -->
+                <div id="detail-tags" class="tags-container">
+                  <!-- 動的に生成 -->
+                </div>
+              </header>
+
+              <!-- プロフィール詳細情報グリッド -->
+              <section class="detail-section info-grid">
+                <div class="info-item">
+                  <span class="info-label">初回来店日</span>
+                  <span id="detail-first-visit" class="info-value">未設定</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">最終来店日</span>
+                  <span id="detail-last-visit" class="info-value">未設定</span>
+                </div>
+                <div class="info-item">
+                  <span class="info-label">来店回数</span>
+                  <span id="detail-visit-count" class="info-value">1回</span>
+                </div>
+                <div class="info-item full-width">
+                  <span class="info-label">特徴・好み（アバター、好きな飲み物など）</span>
+                  <p id="detail-characteristics" class="info-text">未設定</p>
+                </div>
+              </section>
+
+              <!-- 会話記録・メモのタイムライン -->
+              <section class="detail-section timeline-section">
+                <h3 class="section-title">会話履歴 & メモ</h3>
+                
+                <!-- 新しいメモの追加フォーム -->
+                <div class="note-add-form">
+                  <textarea id="new-note-input" placeholder="今日の会話内容、好みの変更、次回話したいことなど..." rows="2"></textarea>
+                  <div class="note-add-actions">
+                    <input type="date" id="new-note-date">
+                    <button id="add-note-btn" class="btn btn-primary btn-sm">メモを追加</button>
+                  </div>
+                </div>
+
+                <!-- メモのタイムライン一覧 -->
+                <div id="notes-timeline" class="notes-timeline">
+                  <!-- 動的に生成 -->
+                </div>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <!-- 本の端から飛び出るアルファベット・インデックスタブ -->
+        <nav class="book-tabs" id="book-tabs">
+          <!-- JSでA-Z、あ-わ、その他などを動的に配置 -->
+        </nav>
+      </div>
+    </main>
+  </div>
+
+  <!-- 顧客の追加/編集モーダル -->
+  <div id="guest-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box glass-panel">
+      <div class="modal-header">
+        <h3 id="modal-title">新規顧客登録</h3>
+        <button id="modal-close" class="close-btn">&times;</button>
+      </div>
+      <form id="guest-form" class="modal-body">
+        <input type="hidden" id="edit-guest-id">
+        
+        <div class="form-row split">
+          <div class="form-group">
+            <label for="form-name">お名前（ニックネーム等） <span class="required">*</span></label>
+            <input type="text" id="form-name" required placeholder="例：アリス">
+          </div>
+          <div class="form-group">
+            <label for="form-pronunciation">ふりがな</label>
+            <input type="text" id="form-pronunciation" placeholder="例：ありす">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="form-vrc-name">VRChatユーザー名（ID）</label>
+          <input type="text" id="form-vrc-name" placeholder="例：Alice_VRC">
+        </div>
+
+        <div class="form-row split">
+          <div class="form-group">
+            <label for="form-x-id">X (Twitter) ID</label>
+            <input type="text" id="form-x-id" placeholder="例：@alice_vrc">
+          </div>
+          <div class="form-group">
+            <label for="form-discord-id">Discord ユーザー名</label>
+            <input type="text" id="form-discord-id" placeholder="例：alice_discord">
+          </div>
+        </div>
+
+        <div class="form-row split">
+          <div class="form-group">
+            <label for="form-first-visit">初回来店日</label>
+            <input type="date" id="form-first-visit">
+          </div>
+          <div class="form-group">
+            <label for="form-last-visit">最終来店日</label>
+            <input type="date" id="form-last-visit">
+          </div>
+        </div>
+
+        <div class="form-row split">
+          <div class="form-group">
+            <label for="form-visit-count">来店回数</label>
+            <input type="number" id="form-visit-count" min="1" value="1">
+          </div>
+          <div class="form-group">
+            <!-- スペース調整用の空セル -->
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="form-tags">タグ（カンマ区切り、またはスペース区切り）</label>
+          <input type="text" id="form-tags" placeholder="例：常連, VIP, お酒好き, 猫耳">
+          <p class="field-help">登録済みのタグ：<span id="suggested-tags">タグがありません</span></p>
+        </div>
+
+        <div class="form-group">
+          <label for="form-characteristics">特徴・好み（アバター、趣味、ドリンク等）</label>
+          <textarea id="form-characteristics" placeholder="例：水色の猫耳アバターが多い。ジントニックが好き。休日はゲームをしているらしい。" rows="3"></textarea>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" id="modal-cancel" class="btn btn-secondary">キャンセル</button>
+          <button type="submit" class="btn btn-primary">保存する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- データ管理（設定）モーダル -->
+  <div id="settings-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box glass-panel">
+      <div class="modal-header">
+        <h3>魔導書のデータ管理</h3>
+        <button id="settings-close" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body settings-body">
+        <section class="settings-section">
+          <h4>データのバックアップ（エクスポート）</h4>
+          <p>登録したすべての顧客データをJSONファイルとしてダウンロードします。ブラウザのキャッシュをクリアする前のバックアップとして保存してください。</p>
+          <button id="export-btn" class="btn btn-primary">📥 データをダウンロード</button>
+        </section>
+        
+        <hr class="settings-divider">
+
+        <section class="settings-section">
+          <h4>データの復元（インポート）</h4>
+          <p>エクスポートしたJSONファイルからデータを復元します。現在のデータはすべて上書きされますのでご注意ください。</p>
+          <div class="import-row">
+            <input type="file" id="import-file-input" accept=".json" style="display: none;">
+            <button id="import-trigger-btn" class="btn btn-secondary">📁 ファイルを選択</button>
+            <span id="selected-file-name" class="file-name">選択されていません</span>
+          </div>
+          <button id="import-btn" class="btn btn-danger" style="margin-top: 10px;" disabled>📤 データを復元する</button>
+        </section>
+        
+        <hr class="settings-divider">
+
+        <section class="settings-section">
+          <h4>デモデータの作成</h4>
+          <p>ツールの動作確認用に、サンプルの顧客データを生成します。（既存のデータは削除されません）</p>
+          <button id="demo-data-btn" class="btn btn-secondary">🪄 デモデータを追加</button>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- トースト通知 -->
+  <div id="toast" class="toast" style="display: none;">通知メッセージ</div>
+
+  <!-- データベース設定ウィザード モーダル -->
+  <div id="db-setup-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-box glass-panel setup-wizard-box" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3>✨ 顧客魔導書 - クラウドDB初期設定</h3>
+      </div>
+      <div class="modal-body">
+        <p class="setup-intro" style="font-size: 12px; line-height: 1.6; color: var(--text-secondary); margin-bottom: 15px;">
+          お嬢、顧客魔導書へようこそ。<br>
+          このアプリをクラウド（Supabase）と連携し、誰でもスマホ等から共同編集できるようにするため、以下の設定を行ってください。
+        </p>
+        
+        <div class="setup-instructions glass-panel" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 12px; margin-bottom: 15px; font-size: 11px; max-height: 200px; overflow-y: auto;">
+          <h5 style="color: var(--color-cyan); margin-bottom: 8px; font-weight: 600;">🔑 設定手順</h5>
+          <ol style="padding-left: 15px; display: flex; flex-direction: column; gap: 6px; color: var(--text-secondary);">
+            <li><a href="https://supabase.com" target="_blank" style="color: var(--color-cyan); text-decoration: underline;">Supabase (supabase.com)</a> にサインアップし、新規プロジェクトを作成します。</li>
+            <li>プロジェクト画面の <b>Project Settings ➔ API</b> ページを開き、<b>Project URL</b> と <b>anon (public)</b> キーをコピーし、以下に入力します。</li>
+            <li>プロジェクト画面 of <b>SQL Editor ➔ New query</b> を開き、以下のSQLを貼り付けて <b>Run</b> ボタンを押します。</li>
+          </ol>
+          <textarea readonly style="width: 100%; height: 80px; font-family: monospace; font-size: 9px; margin-top: 8px; background: rgba(0,0,0,0.4); color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; resize: none;" onclick="this.select()">-- SQL Editorに貼り付けて実行してください
+create table if not exists guests (
+  id text primary key,
+  name text not null,
+  pronunciation text,
+  vrc_name text,
+  x_id text,
+  discord_id text,
+  first_visit text,
+  last_visit text,
+  visit_count integer default 1,
+  tags text[] default '{}',
+  characteristics text,
+  notes jsonb default '[]'::jsonb
+);
+
+create table if not exists realtime_events (
+  id bigint generated always as identity primary key,
+  type text not null,
+  player_name text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter publication supabase_realtime add table guests;
+alter publication supabase_realtime add table realtime_events;
+</textarea>
+        </div>
+
+        <form id="db-setup-form" class="setup-form" style="display: flex; flex-direction: column; gap: 15px;">
+          <div class="form-group">
+            <label for="setup-db-url">Supabase Project URL <span class="required">*</span></label>
+            <input type="text" id="setup-db-url" required placeholder="https://xxxxxxxxxxxxxx.supabase.co" style="width: 100%;">
+          </div>
+          <div class="form-group">
+            <label for="setup-db-key">Supabase anon public Key <span class="required">*</span></label>
+            <input type="text" id="setup-db-key" required placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="width: 100%;">
+          </div>
+          
+          <p style="font-size: 10px; color: var(--text-muted); line-height: 1.5; margin-top: 5px;">
+            ※ 接続に成功すると、必要なテーブルがデータベース内に自動構成されます。<br>
+            ※ 設定情報はブラウザとローカル設定ファイルに安全に保存されます。
+          </p>
+
+          <div class="modal-footer" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 14px;">接続して魔導書を展開する 🔮</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
