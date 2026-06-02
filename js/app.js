@@ -894,29 +894,40 @@ function setupEventListeners() {
   document.getElementById('import-file-input').addEventListener('change', handleImportFileChange);
   document.getElementById('import-btn').addEventListener('click', importData);
   document.getElementById('demo-data-btn').addEventListener('click', generateDemoData);
-  document.getElementById('edit-db-btn').addEventListener('click', () => {
-    // 現在の設定値を取得して入力欄にセット
-    const url = localStorage.getItem('supabase_url') || '';
-    const key = localStorage.getItem('supabase_key') || '';
-    document.getElementById('setup-db-url').value = url;
-    document.getElementById('setup-db-key').value = key;
-    
-    // 設定ダイアログを閉じ、初期設定モーダルを開く
-    closeSettingsModal();
-    
-    // 既に設定されている場合は閉じるボタンを表示
-    if (url && key) {
-      document.getElementById('db-setup-close').style.display = 'block';
-    } else {
-      document.getElementById('db-setup-close').style.display = 'none';
-    }
-    
-    document.getElementById('db-setup-modal').style.display = 'flex';
-  });
+  const editDbBtn = document.getElementById('edit-db-btn');
+  if (editDbBtn) {
+    editDbBtn.addEventListener('click', () => {
+      const url = localStorage.getItem('supabase_url') || '';
+      const key = localStorage.getItem('supabase_key') || '';
+      
+      const urlInput = document.getElementById('setup-db-url');
+      const keyInput = document.getElementById('setup-db-key');
+      if (urlInput) urlInput.value = url;
+      if (keyInput) keyInput.value = key;
+      
+      closeSettingsModal();
+      
+      const setupCloseBtn = document.getElementById('db-setup-close');
+      if (setupCloseBtn) {
+        if (url && key) {
+          setupCloseBtn.style.display = 'block';
+        } else {
+          setupCloseBtn.style.display = 'none';
+        }
+      }
+      
+      const setupModal = document.getElementById('db-setup-modal');
+      if (setupModal) setupModal.style.display = 'flex';
+    });
+  }
 
-  document.getElementById('db-setup-close').addEventListener('click', () => {
-    document.getElementById('db-setup-modal').style.display = 'none';
-  });
+  const setupCloseBtn = document.getElementById('db-setup-close');
+  if (setupCloseBtn) {
+    setupCloseBtn.addEventListener('click', () => {
+      const setupModal = document.getElementById('db-setup-modal');
+      if (setupModal) setupModal.style.display = 'none';
+    });
+  }
   
   // デフォルト日付インプットの初期値
   document.getElementById('new-note-date').value = getTodayDateString();
@@ -1011,6 +1022,8 @@ async function initSupabase(url, key) {
 // === データベース初期設定ウィザード ===
 function setupDbWizard() {
   const modal = document.getElementById('db-setup-modal');
+  if (!modal) return;
+  
   const form = document.getElementById('db-setup-form');
   const closeBtn = document.getElementById('db-setup-close');
   
@@ -1018,48 +1031,54 @@ function setupDbWizard() {
   const key = localStorage.getItem('supabase_key');
   
   if (!url || !key) {
-    closeBtn.style.display = 'none';
+    if (closeBtn) closeBtn.style.display = 'none';
     modal.style.display = 'flex';
   } else {
-    closeBtn.style.display = 'block';
+    if (closeBtn) closeBtn.style.display = 'block';
     initSupabase(url, key).catch(() => {
       // 起動時初期化に失敗した場合はモーダルを開く
       modal.style.display = 'flex';
     });
   }
   
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const inputUrl = document.getElementById('setup-db-url').value.trim();
-    const inputKey = document.getElementById('setup-db-key').value.trim();
-    
-    const submitBtn = form.querySelector('button[type="submit"]');
-    submitBtn.disabled = true;
-    submitBtn.textContent = "接続確認中...";
-    
-    try {
-      if (!window.supabase) {
-        throw new Error("Supabase SDKが読み込まれていません。ページを再読み込みしてください。");
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const inputUrl = document.getElementById('setup-db-url').value.trim();
+      const inputKey = document.getElementById('setup-db-key').value.trim();
+      
+      const submitBtn = form.querySelector('button[type="submit"]');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = "接続確認中...";
       }
-      // 接続テスト
-      const tempClient = window.supabase.createClient(inputUrl, inputKey);
-      const { error } = await tempClient.from('guests').select('count', { count: 'exact', head: true });
-      if (error) throw error;
       
-      localStorage.setItem('supabase_url', inputUrl);
-      localStorage.setItem('supabase_key', inputKey);
-      modal.style.display = 'none';
-      showToast("クラウドDBへの接続に成功しました！");
-      
-      await initSupabase(inputUrl, inputKey);
-    } catch (err) {
-      console.error(err);
-      alert("データベースに接続できませんでした。以下の原因が考えられます：\n\n1. URLかanon keyが間違っている\n2. SQL Editorでテーブル作成用クエリを実行していない\n\nエラー詳細: " + err.message);
-    } finally {
-      submitBtn.disabled = false;
-      submitBtn.textContent = "接続して顧客名簿を展開する 👥";
-    }
-  });
+      try {
+        if (!window.supabase) {
+          throw new Error("Supabase SDKが読み込まれていません。ページを再読み込みしてください。");
+        }
+        // 接続テスト
+        const tempClient = window.supabase.createClient(inputUrl, inputKey);
+        const { error } = await tempClient.from('guests').select('count', { count: 'exact', head: true });
+        if (error) throw error;
+        
+        localStorage.setItem('supabase_url', inputUrl);
+        localStorage.setItem('supabase_key', inputKey);
+        modal.style.display = 'none';
+        showToast("クラウドDBへの接続に成功しました！");
+        
+        await initSupabase(inputUrl, inputKey);
+      } catch (err) {
+        console.error(err);
+        alert("データベースに接続できませんでした。以下の原因が考えられます：\n\n1. URLかanon keyが間違っている\n2. SQL Editorでテーブル作成用クエリを実行していない\n\nエラー詳細: " + err.message);
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = "接続して顧客名簿を展開する 👥";
+        }
+      }
+    });
+  }
 }
 
 // === Supabase リアルタイム同期連携 ===
