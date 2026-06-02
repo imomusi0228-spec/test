@@ -265,63 +265,80 @@
         <h3>顧客名簿のデータ管理</h3>
         <button id="settings-close" class="close-btn">&times;</button>
       </div>
-      <div class="modal-body settings-body">
-        <section class="settings-section">
-          <h4>データのバックアップ（エクスポート）</h4>
-          <p>登録したすべての顧客データをJSONファイルとしてダウンロードします。ブラウザのキャッシュをクリアする前のバックアップとして保存してください。</p>
-          <button id="export-btn" class="btn btn-primary">📥 データをダウンロード</button>
-        </section>
-        
-        <hr class="settings-divider">
-
-        <section class="settings-section">
-          <h4>データの復元（インポート）</h4>
-          <p>エクスポートしたJSONファイルからデータを復元します。現在のデータはすべて上書きされますのでご注意ください。</p>
-          <div class="import-row">
-            <input type="file" id="import-file-input" accept=".json" style="display: none;">
-            <button id="import-trigger-btn" class="btn btn-secondary">📁 ファイルを選択</button>
-            <span id="selected-file-name" class="file-name">選択されていません</span>
+      <div class="modal-body settings-body" style="gap: 12px;">
+        <details class="settings-details" open>
+          <summary class="settings-summary">
+            <h4>📥 データのバックアップ（エクスポート）</h4>
+            <span class="accordion-icon">▼</span>
+          </summary>
+          <div class="settings-content">
+            <p>登録したすべての顧客データをJSONファイルとしてダウンロードします。ブラウザのキャッシュをクリアする前のバックアップとして保存してください。</p>
+            <button id="export-btn" class="btn btn-primary">📥 データをダウンロード</button>
           </div>
-          <button id="import-btn" class="btn btn-danger" style="margin-top: 10px;" disabled>📤 データを復元する</button>
-        </section>
+        </details>
         
-        <hr class="settings-divider">
-
-        <section class="settings-section">
-          <h4>デモデータの作成</h4>
-          <p>ツールの動作確認用に、サンプルの顧客データを生成します。（既存のデータは削除されません）</p>
-          <button id="demo-data-btn" class="btn btn-secondary">🪄 デモデータを追加</button>
-        </section>
-
-        <hr class="settings-divider">
-
-        <section class="settings-section">
-          <h4>自動バッジ認定のしきい値設定</h4>
-          <p>来店回数に応じて自動的に「準常連」「常連」「VIP」のバッジを付与するしきい値を設定します。</p>
-          <div class="thresholds-row" style="display: flex; gap: 15px; margin-bottom: 15px; margin-top: 10px;">
-            <div class="form-group" style="flex: 1;">
-              <label for="threshold-semi-regular" style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 5px;">準常連（回以上）</label>
-              <input type="number" id="threshold-semi-regular" min="1" value="3" style="width: 100%; padding: 8px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); color: #fff;">
+        <details class="settings-details">
+          <summary class="settings-summary">
+            <h4>📤 データの復元（インポート）</h4>
+            <span class="accordion-icon">▼</span>
+          </summary>
+          <div class="settings-content">
+            <p>エクスポートしたJSONファイルからデータを復元します。現在のデータはすべて上書きされますのでご注意ください。</p>
+            <div class="import-row" style="margin-bottom: 10px;">
+              <input type="file" id="import-file-input" accept=".json" style="display: none;">
+              <button id="import-trigger-btn" class="btn btn-secondary">📁 ファイルを選択</button>
+              <span id="selected-file-name" class="file-name">選択されていません</span>
             </div>
-            <div class="form-group" style="flex: 1;">
-              <label for="threshold-regular" style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 5px;">常連（回以上）</label>
-              <input type="number" id="threshold-regular" min="1" value="5" style="width: 100%; padding: 8px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); color: #fff;">
-            </div>
-            <div class="form-group" style="flex: 1;">
-              <label for="threshold-vip" style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 5px;">👑 VIP（回以上）</label>
-              <input type="number" id="threshold-vip" min="1" value="10" style="width: 100%; padding: 8px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); color: #fff;">
-            </div>
+            <button id="import-btn" class="btn btn-danger" disabled>📤 データを復元する</button>
           </div>
-          <button id="save-thresholds-btn" class="btn btn-primary" style="margin-bottom: 10px;">💾 設定を保存する</button>
-        </section>
+        </details>
+        
+        <details class="settings-details">
+          <summary class="settings-summary">
+            <h4>🪄 デモデータの作成</h4>
+            <span class="accordion-icon">▼</span>
+          </summary>
+          <div class="settings-content">
+            <p>ツールの動作確認用に、サンプルの顧客データを生成します。（既存のデータは削除されません）</p>
+            <button id="demo-data-btn" class="btn btn-secondary">🪄 デモデータを追加</button>
+          </div>
+        </details>
 
-        <hr class="settings-divider">
+        <details class="settings-details">
+          <summary class="settings-summary">
+            <h4>⚙️ 自動バッジ認定のしきい値設定</h4>
+            <span class="accordion-icon">▼</span>
+          </summary>
+          <div class="settings-content">
+            <p>来店回数に応じて自動的に「準常連」「常連」「VIP」のバッジを付与するしきい値を設定します。</p>
+            <div class="thresholds-row" style="display: flex; gap: 15px; margin-bottom: 15px; margin-top: 10px;">
+              <div class="form-group" style="flex: 1;">
+                <label for="threshold-semi-regular" style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 5px;">準常連（回以上）</label>
+                <input type="number" id="threshold-semi-regular" min="1" value="3" style="width: 100%; padding: 8px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); color: #fff;">
+              </div>
+              <div class="form-group" style="flex: 1;">
+                <label for="threshold-regular" style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 5px;">常連（回以上）</label>
+                <input type="number" id="threshold-regular" min="1" value="5" style="width: 100%; padding: 8px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); color: #fff;">
+              </div>
+              <div class="form-group" style="flex: 1;">
+                <label for="threshold-vip" style="font-size: 11px; color: var(--text-secondary); display: block; margin-bottom: 5px;">👑 VIP（回以上）</label>
+                <input type="number" id="threshold-vip" min="1" value="10" style="width: 100%; padding: 8px; border-radius: 8px; background: rgba(0,0,0,0.2); border: 1px solid var(--panel-border); color: #fff;">
+              </div>
+            </div>
+            <button id="save-thresholds-btn" class="btn btn-primary" style="margin-bottom: 10px;">💾 設定を保存する</button>
+          </div>
+        </details>
 
-        <section class="settings-section">
-          <h4>クラウドDB（Supabase）の接続設定</h4>
-          <p>SupabaseのProject URLやAPIキーを変更・修正します。（クラウド上のデータは影響を受けません）</p>
-          <button id="edit-db-btn" class="btn btn-secondary">🔑 接続設定を編集する</button>
-        </section>
+        <details class="settings-details">
+          <summary class="settings-summary">
+            <h4>🔑 クラウドDB（Supabase）の接続設定</h4>
+            <span class="accordion-icon">▼</span>
+          </summary>
+          <div class="settings-content">
+            <p>SupabaseのProject URLやAPIキーを変更・修正します。（クラウド上のデータは影響を受けません）</p>
+            <button id="edit-db-btn" class="btn btn-secondary">🔑 接続設定を編集する</button>
+          </div>
+        </details>
       </div>
     </div>
   </div>
