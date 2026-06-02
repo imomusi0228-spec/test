@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VRC Cast Companion - 取扱説明書</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-color: #08080f;
+      --panel-bg: rgba(22, 22, 38, 0.65);
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --text-primary: #f3f3fb;
+      --text-secondary: #a5a5c7;
+      --color-cyan: #00f0ff;
+      --color-purple: #bd00ff;
+      --glow-cyan: 0 0 15px rgba(0, 240, 255, 0.3);
+      --glow-purple: 0 0 15px rgba(189, 0, 255, 0.3);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-primary);
+      font-family: 'Noto Sans JP', sans-serif;
+      line-height: 1.7;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: var(--panel-bg);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--panel-border);
+      border-radius: 24px;
+      padding: 50px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 40px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding-bottom: 30px;
+    }
+
+    h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 32px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--color-cyan) 0%, var(--color-purple) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 10px;
+    }
+
+    .tagline {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    h2 {
+      font-size: 20px;
+      color: var(--color-cyan);
+      margin-top: 40px;
+      margin-bottom: 20px;
+      border-left: 4px solid var(--color-purple);
+      padding-left: 12px;
+    }
+
+    h3 {
+      font-size: 16px;
+      color: #fff;
+      margin-top: 25px;
+      margin-bottom: 10px;
+    }
+
+    p, li {
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 15px;
+    }
+
+    ol, ul {
+      padding-left: 20px;
+      margin-bottom: 20px;
+    }
+
+    li {
+      margin-bottom: 8px;
+    }
+
+    a {
+      color: var(--color-cyan);
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    a:hover {
+      text-shadow: var(--glow-cyan);
+    }
+
+    .alert {
+      background: rgba(0, 240, 255, 0.05);
+      border: 1px solid rgba(0, 240, 255, 0.15);
+      border-radius: 12px;
+      padding: 15px 20px;
+      margin: 20px 0;
+    }
+
+    .alert-title {
+      font-weight: bold;
+      color: var(--color-cyan);
+      margin-bottom: 5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    code {
+      font-family: monospace;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #ff5e62;
+      font-size: 13px;
+    }
+
+    pre {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 20px;
+      border-radius: 12px;
+      overflow-x: auto;
+      margin-bottom: 20px;
+    }
+
+    pre code {
+      background: none;
+      padding: 0;
+      color: var(--text-primary);
+      font-size: 12px;
+    }
+
+    .step-box {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      border-radius: 16px;
+      padding: 25px;
+      margin-bottom: 25px;
+    }
+
+    .step-num {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--color-cyan) 0%, var(--color-purple) 100%);
+      color: #fff;
+      font-family: 'Outfit', sans-serif;
+      font-weight: bold;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 24px;
+      font-size: 12px;
+      margin-right: 8px;
+    }
+
+    .step-title {
+      font-weight: 700;
+      font-size: 16px;
+      color: #fff;
+      display: inline-block;
+      margin-bottom: 15px;
+    }
+
+    .btn {
+      display: inline-block;
+      background: linear-gradient(135deg, var(--color-cyan) 0%, var(--color-purple) 100%);
+      color: #fff !important;
+      font-weight: bold;
+      padding: 10px 24px;
+      border-radius: 8px;
+      text-decoration: none;
+      box-shadow: var(--glow-cyan);
+      transition: transform 0.2s, box-shadow 0.2s;
+      margin-top: 10px;
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>VRC Cast Companion</h1>
+      <div class="tagline">VRChatイベント・店舗用 芳名帳＆キャストメモ連携システム 取扱説明書</div>
+    </header>
+
+    <h2>1. System Overview (システム概要)</h2>
+    <p>
+      この度は「VRC Cast Companion」をご購入いただきありがとうございます。<br>
+      本システムは、<b>VRChatワールド内に設置する3D芳名帳</b>と、キャストが手元（ブラウザ・スマホ）で確認する<b>顧客管理Webダッシュボード</b>を、無料のクラウドベース（Supabase / Vercel）でリアルタイムに同期・連携させるアセットパッケージです。
+    </p>
+
+    <div class="alert">
+      <div class="alert-title">💡 特徴</div>
+      <p>
+        ・ゲストがワールドに入室した瞬間に自動検知。<b>PC起動などの手間は一切なく</b>、自動で来店回数が+1されます。<br>
+        ・入室と同時に、キャストのWeb画面が<b>自動的にそのゲストのカルテページに切り替わります</b>。<br>
+        ・ご自身専用のデータベースを構築するため、情報漏洩や消失の心配がなく、永久無料URLで運用可能です。<br>
+        ・ワールド内名簿には<b>暗証番号（パスコード）ロック機能</b>があり、一般ゲストからのデータ覗き見を防ぎます。
+      </p>
+    </div>
+
+    <h2>2. セットアップ手順</h2>
+
+    <div class="step-box">
+      <span class="step-num">1</span>
+      <span class="step-title">データベース（Supabase）の作成と接続情報の取得</span>
+      <p>
+        1. <a href="https://supabase.com" target="_blank">Supabase (https://supabase.com)</a> にアクセスし、無料アカウントを作成します。<br>
+        2. 新しいプロジェクトを作成します（データベースのパスワードは紛失しないよう控えてください）。<br>
+        3. プロジェクトが作成されたら、左メニューの <b>SQL Editor</b> を開き、<b>New Query</b> をクリックします。<br>
+        4. 以下のSQL文をすべてコピーして貼り付け、右下の <b>Run</b> ボタンをクリックして実行します。
+      </p>
+      <pre><code>-- guests（顧客台帳）テーブルの作成
+create table if not exists guests (
+  id text primary key,
+  name text not null,
+  pronunciation text,
+  vrc_name text,
+  x_id text,
+  discord_id text,
+  first_visit text,
+  last_visit text,
+  visit_count integer default 1,
+  tags text[] default '{}',
+  characteristics text,
+  notes jsonb default '[]'::jsonb
+);
+
+-- realtime_events（入室・記名通知）テーブルの作成
+create table if not exists realtime_events (
+  id bigint generated always as identity primary key,
+  type text not null,
+  player_name text,
+  comment text,
+  visit_count integer,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- リアルタイム配信（レプリケーション）を有効化
+alter publication supabase_realtime add table guests;
+alter publication supabase_realtime add table realtime_events;</code></pre>
+
+      <h3 style="margin-top: 25px; color: var(--color-cyan); border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 8px;">🔑 接続情報（Project ID と APIキー）の取得手順</h3>
+      <p>WebダッシュボードやUnity（VRChat）と接続するためのIDとキーをコピーします：</p>
+      <ol style="padding-left: 20px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
+        <li>画面左端にある黒い縦一列のメニューの最下部付近にある <b>⚙️（Project Settings / 歯車マーク）</b> をクリックします。</li>
+        <li>
+          <b>プロジェクトURL（Project URL）のコピー：</b><br>
+          歯車マークをクリックすると右側に現れるメニューの一番上にある <b>General</b> をクリックします。<br>
+          画面中央の <b>General Settings</b> 欄にある <b>Project URL</b>（または <b>API Endpoint</b>）の右側にある <b>[Copy]（📋）</b> ボタンをクリックしてコピーします。
+        </li>
+        <li>
+          <b>APIキー（anon public key）のコピー：</b><br>
+          同じメニュー内にある <b>API Keys</b> をクリックします。<br>
+          画面中央の <b>Publishable key</b> 欄にある <code>default</code> の右側（<code>sb.publishable_...</code>）の <b>[Copy]（📋）</b> ボタンをクリックしてコピーします。<br>
+          <span style="color: #ff5e62; font-size: 12px; font-weight: 500;">※注意：下にある「Secret keys」は管理者用の秘密鍵ですので、絶対に使用しないでください。</span>
+        </li>
+      </ol>
+    </div>
+
+    <div class="step-box">
+      <span class="step-num">2</span>
+      <span class="step-title">Webアプリのクラウド公開（Vercelデプロイ）</span>
+      <p>サーバーやプログラムの知識がなくても、以下のいずれかの方法で簡単にインターネット上へ自分専用の名簿ダッシュボードを公開（デプロイ）できます。どちらも完全無料で利用可能です。</p>
+      
+      <h3>【方法A】1クリックでデプロイ（最も簡単・おすすめ）</h3>
+      <p>以下のボタンをクリックすると、GitHubへのコピー作成からVercelへの公開までをほぼ自動で行えます。</p>
+      <p>
+        1. 下記の「Deploy to Vercel」ボタンをクリックし、画面の指示に従ってGitHubおよびVercelの無料アカウントを作成・ログインします。<br>
+        2. リポジトリ作成画面が出たら、任意の名前（例: <code>vrc-cast-companion</code>）を入力して「Create」を押します。<br>
+        3. 途中で**「Configure Project（プロジェクト設定）」**の画面が表示されたら、<b>Environment Variables（環境変数）</b>の入力欄に、Step 1で取得したSupabaseの値を入力します：
+      </p>
+      <ul>
+        <li><code>SUPABASE_URL</code> : Supabaseの <b>Project URL</b>（例：<code>https://[あなたのProject ID].supabase.co</code>）を入力</li>
+        <li><code>SUPABASE_KEY</code> : Supabaseの <b>anon public API Key</b> を入力</li>
+      </ul>
+      <p>
+        4. 「Deploy」ボタンを押すと、数十秒で公開URL（例：<code>https://your-name.vercel.app</code>）が完成します！
+      </p>
+      <p>
+        <a href="https://vercel.com/new/clone?repository-url=https://github.com/dansy/vrc-cast-companion" target="_blank" class="btn">Deploy to Vercel</a>
+      </p>
+
+      <h3>【方法B】手動でGitHubにアップロードしてデプロイ</h3>
+      <p>
+        1. 無料の <a href="https://github.com" target="_blank">GitHub</a> アカウントを作成し、新規リポジトリを作成します。<br>
+        2. 本製品の <code>2_WebDashboard/</code> フォルダ内のすべてのファイルを、作成したGitHubリポジトリにアップロード（プッシュ）します。（※VSCodeのGit機能や、GitHub Desktopアプリなどを使うとドラッグ＆ドロップ感覚で簡単です）<br>
+        3. <a href="https://vercel.com" target="_blank">Vercel</a> にログインし、「Add New ➔ Project」から先ほどアップロードしたGitHubリポジトリをインポートします。<br>
+        4. 設定画面の「Environment Variables」欄に、上記と同様に <code>SUPABASE_URL</code> と <code>SUPABASE_KEY</code> の2つを登録します。<br>
+        5. 「Deploy」ボタンを押せば、数十秒後に公開URLが生成されます。
+      </p>
+    </div>
+
+    <div class="step-box">
+      <span class="step-num">3</span>
+      <span class="step-title">Unity（VRChatワールド）への導入</span>
+      <p>
+        1. Unityプロジェクトに <code>1_UnityAssets/VRCGuestBook.cs</code> をインポートします（UdonSharp Behaviourとして自動変換されます）。<br>
+        2. ワールド内に名簿UI（本モデル、入力UI、表示UI）を配置し、Udon Behaviourをアタッチします。<br>
+        3. Udon Behaviour内の変数設定にて、<b>Base Url</b> に <code>Vercelの公開URL/api</code>（例: <code>https://your-app.vercel.app/api</code>）を設定します。<br>
+        4. 以下のセキュリティおよびパネル変数を設定します：
+      </p>
+      <ul>
+        <li><code>Passcode</code> : キャスト閲覧ページを開くための任意の暗証番号（数字4桁など）を入力。</li>
+        <li><code>Guest Panel</code> : 一般ゲストがコメントを入力するパネルGameObjectをアタッチ。</li>
+        <li><code>Lock Panel</code> : パスコードを入力するロック画面GameObjectをアタッチ。</li>
+        <li><code>Cast Panel</code> : ロック解除後に表示されるキャスト用の名簿表示GameObjectをアタッチ。</li>
+        <li><code>Passcode Input Field</code> : 暗証番号を入力するInputFieldUIをアタッチ。</li>
+      </ul>
+      <p>
+        5. 各種ボタンの <code>OnClick</code> イベントにUdonの <code>SendCustomEvent</code> を登録します：
+      </p>
+      <ul>
+        <li>コメント送信ボタン : <code>OnRegisterClick</code></li>
+        <li>ロック解除ボタン : <code>OnUnlockClick</code></li>
+        <li>再びロックするボタン : <code>OnLockClick</code></li>
+      </ul>
+    </div>
+
+    <h2>3. 動作仕様</h2>
+    <h3>自動来店カウント（12時間重複防止）</h3>
+    <p>
+      ゲストがワールドに入室した時点で、Udonが自動的にVercel APIを経由してデータベースへ入室通知を送ります。<br>
+      この際、前回の入室日時から<b>12時間以上</b>経過していた場合、新しい「来店」とみなして来店カウントが自動的に `+1` されます。<br>
+      12時間以内の再入室（回線落ちによる再接続など）のときは、来店数はカウントアップされずにログイン情報のみが記録されます。
+    </p>
+
+    <h3>一般ゲストとキャスト画面の保護</h3>
+    <p>
+      ゲスト用画面には個人情報（他プレイヤーの名前や来店回数の履歴）は一切表示されず、自身のコメント送信欄のみが提供されます。<br>
+      事前に設定した暗証番号を入力してロックを解除することで、初めてキャスト用パネル（過去の記名履歴・来店回数一覧）が表示されます。これにより、ワールド内でのプライバシーが厳重に守られます。
+    </p>
+
+    <h2>4. サポート・利用規約</h2>
+    <p>
+      ・本アセットの改変、および購入者個人（または所属店舗）のイベントでの利用は自由です。<br>
+      ・本アセットに含まれるプログラムファイル、3Dモデル等をそのまま第三者へ二次配布することは禁止します。
+    </p>
+    <p style="text-align: center; margin-top: 50px; color: var(--text-muted); font-size: 11px;">
+      &copy; 2026 VRC Cast Companion Project. All rights reserved.
+    </p>
+  </div>
+</body>
+</html>
