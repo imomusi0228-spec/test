@@ -98,6 +98,7 @@ async function loadData() {
         lastVisit: dbGuest.last_visit || '',
         visitCount: dbGuest.visit_count || 1,
         isCast: dbGuest.is_cast || false,
+        isActiveToday: dbGuest.is_active_today || false,
         tags: dbGuest.tags || [],
         characteristics: dbGuest.characteristics || '',
         notes: dbGuest.notes || []
@@ -126,6 +127,7 @@ async function loadData() {
         if (!g.tags) g.tags = [];
         if (g.visitCount === undefined) g.visitCount = 1;
         if (g.isCast === undefined) g.isCast = false;
+        if (g.isActiveToday === undefined) g.isActiveToday = false;
       });
     } else {
       throw new Error('Server response not OK');
@@ -141,6 +143,7 @@ async function loadData() {
           if (!g.tags) g.tags = [];
           if (g.visitCount === undefined) g.visitCount = 1;
           if (g.isCast === undefined) g.isCast = false;
+          if (g.isActiveToday === undefined) g.isActiveToday = false;
         });
       } catch (err) {
         guests = [];
@@ -215,6 +218,7 @@ async function saveGuest(guest) {
         last_visit: guest.lastVisit || null,
         visit_count: guest.visitCount || 1,
         is_cast: guest.isCast || false,
+        is_active_today: guest.isActiveToday || false,
         tags: guest.tags || [],
         characteristics: guest.characteristics || '',
         notes: guest.notes || []
@@ -425,6 +429,25 @@ function selectGuest(id) {
   const initial = guest.name ? guest.name.charAt(0).toUpperCase() : 'G';
   document.getElementById('detail-avatar').textContent = initial;
   
+  // キャストステータストグル表示
+  const castStatusRow = document.getElementById('detail-cast-status-row');
+  const activeTodayCheckbox = document.getElementById('detail-is-active-today');
+  if (castStatusRow && activeTodayCheckbox) {
+    if (guest.isCast) {
+      castStatusRow.style.display = 'flex';
+      activeTodayCheckbox.checked = guest.isActiveToday || false;
+      
+      activeTodayCheckbox.onclick = async (e) => {
+        guest.isActiveToday = e.target.checked;
+        await saveGuest(guest);
+        renderGuestList();
+        showToast(guest.isActiveToday ? `${guest.name} の本日出勤をオンにしたよ` : `${guest.name} の本日出勤をオフにしたよ`);
+      };
+    } else {
+      castStatusRow.style.display = 'none';
+    }
+  }
+
   // SNS/連絡先
   document.getElementById('detail-x-id').textContent = guest.xId || '未登録';
   document.getElementById('detail-discord-id').textContent = guest.discordId || '未登録';
@@ -599,6 +622,8 @@ function openGuestModal(guestId = null) {
       document.getElementById('form-last-visit').value = guest.lastVisit || '';
       document.getElementById('form-visit-count').value = guest.visitCount || 1;
       document.getElementById('form-is-cast').checked = guest.isCast || false;
+      document.getElementById('form-is-active-today').checked = guest.isActiveToday || false;
+      document.getElementById('form-active-today-container').style.display = guest.isCast ? 'block' : 'none';
       document.getElementById('form-tags').value = (guest.tags || []).join(', ');
       document.getElementById('form-characteristics').value = guest.characteristics || '';
     }
@@ -609,6 +634,8 @@ function openGuestModal(guestId = null) {
     document.getElementById('form-last-visit').value = getTodayDateString();
     document.getElementById('form-visit-count').value = 1;
     document.getElementById('form-is-cast').checked = false;
+    document.getElementById('form-is-active-today').checked = false;
+    document.getElementById('form-active-today-container').style.display = 'none';
   }
   
   modal.style.display = 'flex';
@@ -631,6 +658,7 @@ async function handleGuestFormSubmit(e) {
   const lastVisit = document.getElementById('form-last-visit').value;
   const visitCount = parseInt(document.getElementById('form-visit-count').value, 10) || 1;
   const isCast = document.getElementById('form-is-cast').checked;
+  const isActiveToday = isCast ? document.getElementById('form-is-active-today').checked : false;
   const characteristics = document.getElementById('form-characteristics').value.trim();
   
   // タグ文字列のパース (カンマまたはスペース区切り)
@@ -654,6 +682,7 @@ async function handleGuestFormSubmit(e) {
         lastVisit,
         visitCount,
         isCast,
+        isActiveToday,
         tags,
         characteristics
       };
@@ -673,6 +702,7 @@ async function handleGuestFormSubmit(e) {
       lastVisit,
       visitCount,
       isCast,
+      isActiveToday,
       tags,
       characteristics,
       notes: []
@@ -944,6 +974,22 @@ function setupEventListeners() {
   // フォーム送信
   document.getElementById('guest-form').addEventListener('submit', handleGuestFormSubmit);
   
+  // キャスト登録チェックボックスのトグル監視（出勤登録欄の表示/非表示）
+  const formIsCast = document.getElementById('form-is-cast');
+  if (formIsCast) {
+    formIsCast.addEventListener('change', (e) => {
+      const container = document.getElementById('form-active-today-container');
+      if (container) {
+        container.style.display = e.target.checked ? 'block' : 'none';
+        if (!e.target.checked) {
+          // キャストから外された場合は出勤も自動でオフにする
+          const activeTodayInput = document.getElementById('form-is-active-today');
+          if (activeTodayInput) activeTodayInput.checked = false;
+        }
+      }
+    });
+  }
+
   // 右ページ編集・削除・抜き出し
   document.getElementById('export-single-guest-btn').addEventListener('click', () => {
     if (selectedGuestId) exportSingleGuest(selectedGuestId);

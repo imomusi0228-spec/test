@@ -241,13 +241,15 @@ create table if not exists guests (
   last_visit text,
   visit_count integer default 1,
   is_cast boolean default false,
+  is_active_today boolean default false,
   tags text[] default '{}',
   characteristics text,
   notes jsonb default '[]'::jsonb
 );
 
--- 既存のデータベースがある場合、キャスト用カラムが存在しなければ追加する
+-- 既存のデータベースがある場合、カラムが存在しなければ追加する
 alter table guests add column if not exists is_cast boolean default false;
+alter table guests add column if not exists is_active_today boolean default false;
 
 -- realtime_events（入室・記名通知）テーブルの作成
 create table if not exists realtime_events (
