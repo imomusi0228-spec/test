@@ -570,87 +570,64 @@
       const submitBtn = document.getElementById('btn-signup-submit');
       const loading = document.getElementById('signup-loading');
 
-      // ユーザーIDをダミーメールアドレス形式に変換 (大文字小文字による違いをなくすためtoLowerCase)
-      const email = DUMMY_PREFIX + username.toLowerCase() + DUMMY_DOMAIN;
+      const payload = {
+        username: username,
+        password: password,
+        display_name: displayName,
+        vrc_name: vrcName,
+        role: isMaster ? 'master' : 'cast'
+      };
+
+      if (isMaster) {
+        payload.org_name = document.getElementById('signup-org-name').value.trim();
+      } else {
+        const orgId = document.getElementById('signup-org-id').value.trim();
+        if (!orgId) {
+          showError('キャスト登録には所属店舗ID（招待コード）が必要です。');
+          return;
+        }
+        payload.org_id = orgId;
+      }
 
       try {
         setLoading(submitBtn, loading, true);
 
-        // 1. Supabase Auth で認証用のアカウントを作成
-        const { data, error } = await supabaseClient.auth.signUp({
-          email: email,
-          password: password,
-          options: {
-            data: {
-              display_name: displayName,
-              vrc_name: vrcName,
-              role: isMaster ? 'master' : 'cast'
-            }
-          }
+        // 1. サーバーサイド登録API (/api/signup) を呼び出し
+        const signupRes = await fetch('/api/signup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
         });
 
-        if (error) throw error;
-        if (!data.user) throw new Error('Authアカウントの作成に失敗しました。');
+        const result = await signupRes.json();
+        if (!signupRes.ok) {
+          throw new Error(result.error || 'アカウントの登録に失敗しました。');
+        }
+
+        // 2. 登録成功後、そのまま自動的にログイン処理を実行
+        const email = DUMMY_PREFIX + username.toLowerCase() + DUMMY_DOMAIN;
         
-        const user = data.user;
+        const { data: signinData, error: signinError } = await supabaseClient.auth.signInWithPassword({
+          email: email,
+          password: password
+        });
 
-        // 2. データベースへの直接インサート処理
-        let targetOrgId = null;
+        if (signinError) throw signinError;
 
-        if (isMaster) {
-          // 店舗オーナーの場合：新規に組織（店舗）レコードをインサート
-          const orgName = document.getElementById('signup-org-name').value.trim();
-          const { data: orgData, error: orgError } = await supabaseClient
-            .from('organizations')
-            .insert({ name: orgName })
-            .select()
-            .single();
-
-          if (orgError) throw orgError;
-          targetOrgId = orgData.id;
-        } else {
-          // キャストの場合：入力された店舗ID（招待コード）を使用
-          targetOrgId = document.getElementById('signup-org-id').value.trim();
-          if (!targetOrgId) {
-            throw new Error('所属店舗ID（招待コード）が必要です。');
-          }
-        }
-
-        // 3. ユーザープロフィール（member_profiles）レコードを直接インサート
-        const { error: profileError } = await supabaseClient
-          .from('member_profiles')
-          .insert({
-            id: user.id,
-            org_id: targetOrgId,
-            display_name: displayName,
-            vrc_name: vrcName,
-            role: isMaster ? 'master' : 'cast'
-          });
-
-        if (profileError) throw profileError;
-
-        // 4. 手帳（books）の自動初期作成（店舗オーナー登録時のみ）
-        if (isMaster) {
-          const { error: bookError } = await supabaseClient
-            .from('books')
-            .insert({
-              org_id: targetOrgId,
-              name: 'メイン手帳'
-            });
-          if (bookError) console.error('初期手帳の作成に失敗しました:', bookError);
-        }
-
-        // 自動ログインに成功した場合の遷移
+        // セッション情報をローカルストレージに同期保存（app.jsとの互換用）
         localStorage.setItem('supabase_url', supabaseClient.supabaseUrl);
         localStorage.setItem('supabase_key', supabaseClient.supabaseKey);
-        showSuccess('アカウントの作成およびデータベースへの登録が完了しました！ポータルへ遷移します。');
+
+        showSuccess('アカウントの作成および登録が完了しました！ポータルへ遷移します。');
         
         setTimeout(() => {
           window.location.href = 'portal.html';
         }, 1500);
 
       } catch (err) {
-        showError('登録およびデータインサート失敗: ' + err.message);
+        showError('登録失敗: ' + err.message);
         setLoading(submitBtn, loading, false);
       }
     }
