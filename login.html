@@ -383,7 +383,8 @@
 
   <script>
     let supabaseClient = null;
-    const DUMMY_DOMAIN = "@vrc-companion.com"; // ユーザーIDを裏でメールアドレス化するためのダミードメイン
+    const DUMMY_PREFIX = "vrc-companion-"; // 他人のアドレスと衝突を防ぐための接頭辞
+    const DUMMY_DOMAIN = "@gmail.com"; // DNS(MXレコード)チェックを通過するための実在するドメイン
 
     // 起動時に環境設定をAPIから取得して初期化
     document.addEventListener('DOMContentLoaded', async () => {
@@ -527,8 +528,8 @@
       const submitBtn = document.getElementById('btn-signin-submit');
       const loading = document.getElementById('signin-loading');
 
-      // ユーザーIDをダミーメールアドレス形式に変換
-      const email = username + DUMMY_DOMAIN;
+      // ユーザーIDをダミーメールアドレス形式に変換 (大文字小文字による違いをなくすためtoLowerCase)
+      const email = DUMMY_PREFIX + username.toLowerCase() + DUMMY_DOMAIN;
 
       try {
         setLoading(submitBtn, loading, true);
@@ -569,8 +570,8 @@
       const submitBtn = document.getElementById('btn-signup-submit');
       const loading = document.getElementById('signup-loading');
 
-      // ユーザーIDをダミーメールアドレス形式に変換
-      const email = username + DUMMY_DOMAIN;
+      // ユーザーIDをダミーメールアドレス形式に変換 (大文字小文字による違いをなくすためtoLowerCase)
+      const email = DUMMY_PREFIX + username.toLowerCase() + DUMMY_DOMAIN;
 
       try {
         setLoading(submitBtn, loading, true);
