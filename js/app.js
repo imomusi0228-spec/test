@@ -3,6 +3,7 @@ let guests = [];
 let selectedGuestId = null;
 let currentTab = '全て';
 let searchQuery = '';
+let supabase = null;
 
 // === 定数 ===
 const STORAGE_KEY = 'vrc_cast_companion_guests';
@@ -62,25 +63,47 @@ const DEMO_GUEST_DATA = [
 
 // === 起動時の初期化処理 ===
 document.addEventListener('DOMContentLoaded', async () => {
-  await loadData();
   setupIndexTabs();
   setupEventListeners();
-  renderGuestList();
-  updateTotalCount();
-  setupSSE();
-  
-  // 初回起動時かつデータが空の場合、デモデータを投入
-  if (guests.length === 0) {
-    guests = [...DEMO_GUEST_DATA];
-    await saveData();
-    renderGuestList();
-    updateTotalCount();
-    showToast("サンプル用のデモデータを登録しました！");
-  }
+  setupDbWizard();
 });
 
 // === データ保存・読み込み ===
 async function loadData() {
+  if (supabase) {
+    try {
+      const { data, error } = await supabase.from('guests').select('*');
+      if (error) throw error;
+      
+      guests = data.map(dbGuest => ({
+        id: dbGuest.id,
+        name: dbGuest.name,
+        pronunciation: dbGuest.pronunciation || '',
+        vrcName: dbGuest.vrc_name || '',
+        xId: dbGuest.x_id || '',
+        discordId: dbGuest.discord_id || '',
+        firstVisit: dbGuest.first_visit || '',
+        lastVisit: dbGuest.last_visit || '',
+        visitCount: dbGuest.visit_count || 1,
+        tags: dbGuest.tags || [],
+        characteristics: dbGuest.characteristics || '',
+        notes: dbGuest.notes || []
+      }));
+      
+      // 初回起動時かつデータが空の場合、デモデータを投入
+      if (guests.length === 0) {
+        guests = [...DEMO_GUEST_DATA];
+        for (const demoGuest of guests) {
+          await saveGuest(demoGuest);
+        }
+      }
+      return;
+    } catch (e) {
+      console.error("[Supabase] データの取得に失敗しました。ローカルストレージを使用します。", e);
+    }
+  }
+
+  // サーバーからの読み込み (ローカルデバッグ環境用フォールバック)
   try {
     const response = await fetch('/api/guests');
     if (response.ok) {
@@ -111,12 +134,21 @@ async function loadData() {
       guests = [];
     }
   }
+
+  // 初回起動時かつデータが空の場合、デモデータを投入
+  if (guests.length === 0) {
+    guests = [...DEMO_GUEST_DATA];
+    await saveData();
+  }
 }
 
 async function saveData() {
   updateTotalCount();
   
-  // サーバーに送信
+  // ローカルフォールバック保存
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(guests));
+
+  // サーバーに送信 (ローカルデバッグ用)
   try {
     const response = await fetch('/api/guests', {
       method: 'POST',
@@ -127,12 +159,61 @@ async function saveData() {
     });
     if (!response.ok) throw new Error('Server POST failed');
   } catch (e) {
-    console.error("[Storage] サーバーへのデータ保存に失敗しました。", e);
+    // デバッグサーバーが動いていない場合は無視
   }
-  
-  // ローカルフォールバック保存
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(guests));
 }
+
+async function saveGuest(guest) {
+  // グローバル配列内のデータを更新
+  const index = guests.findIndex(g => g.id === guest.id);
+  if (index !== -1) {
+    guests[index] = guest;
+  } else {
+    guests.push(guest);
+  }
+
+  updateTotalCount();
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(guests));
+
+  // デバッグサーバー（互換用）
+  try {
+    await fetch('/api/guests', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(guests)
+    });
+  } catch (e) {}
+
+  // Supabaseに直接保存
+  if (supabase) {
+    try {
+      const dbGuest = {
+        id: guest.id,
+        name: guest.name,
+        pronunciation: guest.pronunciation || '',
+        vrc_name: guest.vrcName || '',
+        x_id: guest.xId || '',
+        discord_id: guest.discordId || '',
+        first_visit: guest.firstVisit || null,
+        last_visit: guest.lastVisit || null,
+        visit_count: guest.visitCount || 1,
+        tags: guest.tags || [],
+        characteristics: guest.characteristics || '',
+        notes: guest.notes || []
+      };
+      
+      const { error } = await supabase
+        .from('guests')
+        .upsert(dbGuest);
+      if (error) throw error;
+    } catch (e) {
+      console.error("[Supabase] データの保存に失敗しました:", e);
+    }
+  }
+}
+
 
 // === インデックスタブの生成と判定 ===
 function setupIndexTabs() {
@@ -504,7 +585,7 @@ async function handleGuestFormSubmit(e) {
         tags,
         characteristics
       };
-      await saveData();
+      await saveGuest(guests[index]);
       showToast("顧客情報を更新したよ");
     }
   } else {
@@ -524,9 +605,9 @@ async function handleGuestFormSubmit(e) {
       notes: []
     };
     guests.push(newGuest);
-    saveGuest(newGuest);
+    await saveGuest(newGuest);
     selectedGuestId = newGuest.id; // 新規追加した人を自動選択
-    showToast("新しく顧客を魔導書に加えたよ");
+    showToast("新しく顧客を顧客名簿に加えたよ");
   }
   
   closeGuestModal();
@@ -542,21 +623,34 @@ async function deleteGuest(id) {
   }
   
   guests = guests.filter(g => g.id !== id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(guests));
+  
+  // デバッグサーバー（互換用）
+  try {
+    await fetch('/api/guests', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(guests)
+    });
+  } catch (e) {}
+
   if (supabase) {
     try {
-      await supabase.from('guests').delete().eq('id', id);
+      const { error } = await supabase.from('guests').delete().eq('id', id);
+      if (error) throw error;
     } catch (e) {
-      console.error(e);
+      console.error("[Supabase] データの削除に失敗しました:", e);
     }
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(guests));
   
   selectedGuestId = null;
   document.getElementById('no-selection-placeholder').style.display = 'flex';
   document.getElementById('detail-content').style.display = 'none';
   
   renderGuestList();
-  showToast("顧客を魔導書から削除したよ");
+  showToast("顧客を顧客名簿から削除したよ");
 }
 
 // === データ管理（インポート/エクスポート） ===
@@ -862,6 +956,19 @@ function escapeHTML(str) {
   );
 }
 
+// === Supabase初期化 ===
+async function initSupabase(url, key) {
+  if (window.supabase) {
+    supabase = window.supabase.createClient(url, key);
+    await loadData();
+    renderGuestList();
+    updateTotalCount();
+    setupSupabaseRealtime();
+  } else {
+    console.error("Supabase JS client is not loaded.");
+  }
+}
+
 // === データベース初期設定ウィザード ===
 function setupDbWizard() {
   const modal = document.getElementById('db-setup-modal');
@@ -896,13 +1003,13 @@ function setupDbWizard() {
       modal.style.display = 'none';
       showToast("クラウドDBへの接続に成功しました！");
       
-      initSupabase(inputUrl, inputKey);
+      await initSupabase(inputUrl, inputKey);
     } catch (err) {
       console.error(err);
       alert("データベースに接続できませんでした。以下の原因が考えられます：\n\n1. URLかanon keyが間違っている\n2. SQL Editorでテーブル作成用クエリを実行していない\n\nエラー詳細: " + err.message);
     } finally {
       submitBtn.disabled = false;
-      submitBtn.textContent = "接続して魔導書を展開する 🔮";
+      submitBtn.textContent = "接続して顧客名簿を展開する 👥";
     }
   });
 }
