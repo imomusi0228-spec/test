@@ -523,6 +523,7 @@
         const { data: books, error } = await supabaseClient
           .from('books')
           .select('*')
+          .eq('org_id', userProfile.org_id)
           .order('created_at', { ascending: true });
 
         if (error) throw error;
@@ -732,7 +733,8 @@
         // 同じ org_id のすべての手帳のIDを取得
         const { data: books, error: booksError } = await supabaseClient
           .from('books')
-          .select('id');
+          .select('id')
+          .eq('org_id', userProfile.org_id);
 
         if (booksError) throw booksError;
 
