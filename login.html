@@ -294,8 +294,8 @@
       <!-- 1. サインインフォーム -->
       <form id="form-signin" onsubmit="handleSignIn(event)">
         <div class="form-group">
-          <label class="form-label" for="signin-email">メールアドレス</label>
-          <input type="email" id="signin-email" class="form-input" placeholder="your-email@example.com" required autocomplete="email">
+          <label class="form-label" for="signin-username">ユーザーID（半角英数字・記号）</label>
+          <input type="text" id="signin-username" class="form-input" placeholder="例: taro123" required autocomplete="username" pattern="^[a-zA-Z0-9_-]+$" title="半角英数字、ハイフン(-)、アンダーバー(_)のみ使用できます">
         </div>
         <div class="form-group">
           <label class="form-label" for="signin-password">パスワード</label>
@@ -323,8 +323,8 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="signup-email">メールアドレス</label>
-          <input type="email" id="signup-email" class="form-input" placeholder="your-email@example.com" required autocomplete="email">
+          <label class="form-label" for="signup-username">ユーザーID（半角英数字・3文字以上）</label>
+          <input type="text" id="signup-username" class="form-input" placeholder="例: cast_hina" required autocomplete="username" pattern="^[a-zA-Z0-9_-]{3,}$" title="3文字以上の半角英数字、ハイフン(-)、アンダーバー(_)のみ使用できます">
         </div>
         <div class="form-group">
           <label class="form-label" for="signup-password">パスワード（6文字以上）</label>
@@ -383,6 +383,7 @@
 
   <script>
     let supabaseClient = null;
+    const DUMMY_DOMAIN = "@vrc-companion.local"; // ユーザーIDを裏でメールアドレス化するためのダミードメイン
 
     // 起動時に環境設定をAPIから取得して初期化
     document.addEventListener('DOMContentLoaded', async () => {
@@ -521,10 +522,13 @@
       e.preventDefault();
       clearAlerts();
       
-      const email = document.getElementById('signin-email').value.trim();
+      const username = document.getElementById('signin-username').value.trim();
       const password = document.getElementById('signin-password').value;
       const submitBtn = document.getElementById('btn-signin-submit');
       const loading = document.getElementById('signin-loading');
+
+      // ユーザーIDをダミーメールアドレス形式に変換
+      const email = username + DUMMY_DOMAIN;
 
       try {
         setLoading(submitBtn, loading, true);
@@ -546,7 +550,7 @@
         }, 1000);
 
       } catch (err) {
-        showError('ログイン失敗: ' + err.message);
+        showError('ログイン失敗: ユーザーIDまたはパスワードが違います。');
         setLoading(submitBtn, loading, false);
       }
     }
@@ -556,7 +560,7 @@
       e.preventDefault();
       clearAlerts();
 
-      const email = document.getElementById('signup-email').value.trim();
+      const username = document.getElementById('signup-username').value.trim();
       const password = document.getElementById('signup-password').value;
       const displayName = document.getElementById('signup-display-name').value.trim();
       const vrcName = document.getElementById('signup-vrc-name').value.trim();
@@ -564,6 +568,9 @@
       
       const submitBtn = document.getElementById('btn-signup-submit');
       const loading = document.getElementById('signup-loading');
+
+      // ユーザーIDをダミーメールアドレス形式に変換
+      const email = username + DUMMY_DOMAIN;
 
       // メタデータ構築
       const metadata = {
@@ -596,9 +603,10 @@
 
         if (error) throw error;
 
-        // Supabaseの設定によってはメール認証が必要
+        // ユーザーID形式ログインの場合、メール認証を不要として直ちにログインセッションを確立
         if (data.session === null) {
-          showSuccess('アカウントを作成しました！確認用メールを送信しましたのでメールボックスをご確認ください。');
+          // もしメール確認がSupabase側でONになっている場合
+          showSuccess('アカウントを作成しました！(メール認証設定が有効な場合、確認メールが届くことがあります。通常はそのままログイン可能です)');
           setLoading(submitBtn, loading, false);
         } else {
           // 自動ログイン時
@@ -611,7 +619,7 @@
         }
 
       } catch (err) {
-        showError('登録失敗: ' + err.message);
+        showError('登録失敗: このユーザーIDは既に使用されている可能性があります。 (' + err.message + ')');
         setLoading(submitBtn, loading, false);
       }
     }

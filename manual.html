@@ -392,6 +392,15 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.realtime_events;</code></pr
           画面中央の <b>Publishable key</b> 欄にある <code>default</code> の右側（<code>sb.publishable_...</code>）の <b>[Copy]（📋）</b> ボタンをクリックしてコピーします。<br>
           <span style="color: #ff5e62; font-size: 12px; font-weight: 500;">※注意：下にある「Secret keys」は管理者用の秘密鍵ですので、絶対に使用しないでください。</span>
         </li>
+        <li style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px;">
+          <b style="color: var(--color-cyan);">【最重要】ユーザーIDログインを有効化するための設定：</b><br>
+          本アセットは、メールアドレスを使わずに「ユーザーID（半角英数字）」でログイン・登録を行う設計となっています。正しくサインアップを行うために、必ず以下のメール確認機能をオフにしてください。<br>
+          1. Supabaseの左メニューにある <b>Authentication (鍵マーク)</b> をクリックします。<br>
+          2. その中に現れるメニューから <b>Providers</b> を選択します。<br>
+          3. <b>Email</b> の設定を開き、<b>Confirm email</b>（メールアドレスの確認）のトグルスイッチを <b>OFF（無効化）</b> に設定します。<br>
+          4. 画面最下部にある <b>Save</b> ボタンをクリックして保存します。<br>
+          <span style="color: #ff5e62; font-size: 12px; font-weight: 500;">※これがONのままだと、ダミーのメールアドレスに確認メールが送信されてしまい、アカウント登録後にログインができなくなります。</span>
+        </li>
       </ol>
     </div>
 
