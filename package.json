@@ -2,7 +2,6 @@
   "name": "vrc-cast-companion",
   "version": "1.0.0",
   "description": "VRChat Cast Companion",
-  "main": "local_debug_server.js",
   "dependencies": {
     "@supabase/supabase-js": "^2.39.8"
   },
