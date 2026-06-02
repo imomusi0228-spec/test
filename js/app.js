@@ -894,6 +894,15 @@ function setupEventListeners() {
   document.getElementById('import-file-input').addEventListener('change', handleImportFileChange);
   document.getElementById('import-btn').addEventListener('click', importData);
   document.getElementById('demo-data-btn').addEventListener('click', generateDemoData);
+  document.getElementById('reset-db-btn').addEventListener('click', () => {
+    if (confirm('保存されているクラウドDBの接続設定をクリアし、初期設定に戻しますか？')) {
+      localStorage.removeItem('supabase_url');
+      localStorage.removeItem('supabase_key');
+      closeSettingsModal();
+      document.getElementById('db-setup-modal').style.display = 'flex';
+      showToast('接続情報をクリアしました。再設定を行ってください。');
+    }
+  });
   
   // デフォルト日付インプットの初期値
   document.getElementById('new-note-date').value = getTodayDateString();
@@ -959,13 +968,29 @@ function escapeHTML(str) {
 // === Supabase初期化 ===
 async function initSupabase(url, key) {
   if (window.supabase) {
-    supabase = window.supabase.createClient(url, key);
+    try {
+      supabase = window.supabase.createClient(url, key);
+      await loadData();
+      renderGuestList();
+      updateTotalCount();
+      setupSupabaseRealtime();
+    } catch (err) {
+      console.error("Supabaseの初期化またはデータロードに失敗しました:", err);
+      // 接続情報をクリアして再設定を促す
+      localStorage.removeItem('supabase_url');
+      localStorage.removeItem('supabase_key');
+      document.getElementById('db-setup-modal').style.display = 'flex';
+      alert("Supabaseへの接続に失敗しました。以前の接続情報をクリアしますので、もう一度正しい設定を入力してください。\n\nエラー: " + err.message);
+      throw err;
+    }
+  } else {
+    const errorMsg = "Supabase JS SDKがロードされていません。インターネット接続状態や、アドブロックによってSDK(cdn.jsdelivr.net)の通信がブロックされていないか確認してください。";
+    console.error(errorMsg);
+    alert(errorMsg);
+    // 初期化に失敗したため、ローカルモードで動作させる
     await loadData();
     renderGuestList();
     updateTotalCount();
-    setupSupabaseRealtime();
-  } else {
-    console.error("Supabase JS client is not loaded.");
   }
 }
 
@@ -980,7 +1005,10 @@ function setupDbWizard() {
   if (!url || !key) {
     modal.style.display = 'flex';
   } else {
-    initSupabase(url, key);
+    initSupabase(url, key).catch(() => {
+      // 起動時初期化に失敗した場合はモーダルを開く
+      modal.style.display = 'flex';
+    });
   }
   
   form.addEventListener('submit', async (e) => {
@@ -993,6 +1021,9 @@ function setupDbWizard() {
     submitBtn.textContent = "接続確認中...";
     
     try {
+      if (!window.supabase) {
+        throw new Error("Supabase SDKが読み込まれていません。ページを再読み込みしてください。");
+      }
       // 接続テスト
       const tempClient = window.supabase.createClient(inputUrl, inputKey);
       const { error } = await tempClient.from('guests').select('count', { count: 'exact', head: true });
