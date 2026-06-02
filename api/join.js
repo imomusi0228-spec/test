@@ -1,6 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 
-// Vercel Serverless Function: GET /api/join?name=名前
+// Vercel Serverless Function: GET /api/join?name=名前&book_id=手帳UUID
 module.exports = async (req, res) => {
   // CORSヘッダー
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -18,10 +18,13 @@ module.exports = async (req, res) => {
     return res.status(500).send('Database environment variables are not configured.');
   }
 
-  const { name } = req.query;
+  const { name, book_id } = req.query;
 
   if (!name) {
     return res.status(400).send('Parameter "name" is required.');
+  }
+  if (!book_id) {
+    return res.status(400).send('Parameter "book_id" is required.');
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey);
@@ -31,10 +34,23 @@ module.exports = async (req, res) => {
     const nowIso = now.toISOString();
     const nameLower = name.toLowerCase();
 
-    // 1. 既存の顧客をチェック
+    // 0. 手帳に紐づく組織ID (org_id) を取得
+    const { data: book, error: bookError } = await supabase
+      .from('books')
+      .select('org_id')
+      .eq('id', book_id)
+      .single();
+
+    if (bookError || !book) {
+      return res.status(404).send('Specfied book not found.');
+    }
+    const orgId = book.org_id;
+
+    // 1. 指定手帳の既存顧客をチェック
     const { data: existingGuests, error: selectError } = await supabase
       .from('guests')
-      .select('*');
+      .select('*')
+      .eq('book_id', book_id);
 
     if (selectError) throw selectError;
 
@@ -68,7 +84,7 @@ module.exports = async (req, res) => {
         targetGuest.visit_count = visitCount;
         targetGuest.last_visit = nowIso;
       } else {
-        // 12時間未満: 再接続または同日内入室とみなす (来店カウントは増やさないが、last_visitを更新)
+        // 12時間未満: 再接続
         isNewVisit = false;
         const { error: updateError } = await supabase
           .from('guests')
@@ -83,6 +99,7 @@ module.exports = async (req, res) => {
       // 新規顧客: レコード作成
       const newGuest = {
         id: 'guest-' + Date.now(),
+        book_id: book_id, // 手帳IDを紐づける
         name: name,
         pronunciation: '',
         vrc_name: name,
@@ -104,10 +121,11 @@ module.exports = async (req, res) => {
       targetGuest = newGuest;
     }
 
-    // 2. リアルタイムイベントログに書き込み (ダッシュボード用通知)
+    // 2. リアルタイムイベントログに書き込み (ダッシュボード用通知、組織ID org_id を付与)
     const { error: eventError } = await supabase
       .from('realtime_events')
       .insert({
+        org_id: orgId, // 組織IDを記録
         type: isNewVisit ? 'player-join' : 'player-reconnect',
         player_name: name,
         comment: isNewVisit ? `自動来店カウントアップ (通算 ${visitCount} 回目)` : `再接続 (通算 ${visitCount} 回目)`,
@@ -116,10 +134,11 @@ module.exports = async (req, res) => {
 
     if (eventError) console.error('[Supabase] イベントログ追加失敗:', eventError);
 
-    // 3. 最新の名簿データを取得して、UdonSharp形式で返却
+    // 3. 最新の手帳データを取得して、UdonSharp形式で返却
     const { data: updatedGuests, error: selectAllError } = await supabase
       .from('guests')
-      .select('*');
+      .select('*')
+      .eq('book_id', book_id);
 
     if (selectAllError) throw selectAllError;
 

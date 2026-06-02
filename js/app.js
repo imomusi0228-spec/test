@@ -4,6 +4,8 @@ let selectedGuestId = null;
 let currentTab = '全て';
 let searchQuery = '';
 let dbClient = null;
+let currentBookId = null;
+let userProfile = null;
 
 // しきい値設定（デフォルト値）
 let semiRegularThreshold = 3;
@@ -75,16 +77,48 @@ const DEMO_GUEST_DATA = [
 // === 起動時の初期化処理 ===
 document.addEventListener('DOMContentLoaded', async () => {
   loadThresholds();
+  
+  // 認証と初期化
+  try {
+    const configRes = await fetch('/api/config');
+    if (!configRes.ok) throw new Error("Config API error");
+    const config = await configRes.json();
+    
+    if (!config.supabaseUrl || !config.supabaseKey) {
+      throw new Error("Supabase URL or Key is not configured on server.");
+    }
+    
+    // Supabase初期化
+    await initSupabase(config.supabaseUrl, config.supabaseKey);
+  } catch (err) {
+    console.error("Initialization failed:", err);
+    // Vercel上の環境変数が設定されていない場合やローカルフォールバック用
+    const url = localStorage.getItem('supabase_url');
+    const key = localStorage.getItem('supabase_key');
+    if (url && key) {
+      await initSupabase(url, key);
+    } else {
+      // 最終フォールバック (ローカルテスト)
+      const params = new URLSearchParams(window.location.search);
+      currentBookId = params.get('book_id') || 'default-book';
+      await loadData();
+      renderGuestList();
+      updateTotalCount();
+    }
+  }
+
   setupIndexTabs();
   setupEventListeners();
-  setupDbWizard();
 });
 
 // === データ保存・読み込み ===
 async function loadData() {
-  if (dbClient) {
+  if (dbClient && currentBookId) {
     try {
-      const { data, error } = await dbClient.from('guests').select('*');
+      const { data, error } = await dbClient
+        .from('guests')
+        .select('*')
+        .eq('book_id', currentBookId);
       if (error) throw error;
       
       guests = data.map(dbGuest => ({
@@ -104,14 +138,6 @@ async function loadData() {
         characteristics: dbGuest.characteristics || '',
         notes: dbGuest.notes || []
       }));
-      
-      // 初回起動時かつデータが空の場合、デモデータを投入
-      if (guests.length === 0) {
-        guests = [...DEMO_GUEST_DATA];
-        for (const demoGuest of guests) {
-          await saveGuest(demoGuest);
-        }
-      }
       return;
     } catch (e) {
       console.error("[Supabase] データの取得に失敗しました。ローカルストレージを使用します。", e);
@@ -166,8 +192,9 @@ async function loadData() {
 async function saveData() {
   updateTotalCount();
   
-  // ローカルフォールバック保存
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(guests));
+  // ローカルフォールバック保存 (手帳ID別)
+  const localKey = currentBookId ? `${STORAGE_KEY}_${currentBookId}` : STORAGE_KEY;
+  localStorage.setItem(localKey, JSON.stringify(guests));
 
   // サーバーに送信 (ローカルデバッグ用)
   try {
@@ -194,7 +221,8 @@ async function saveGuest(guest) {
   }
 
   updateTotalCount();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(guests));
+  const localKey = currentBookId ? `${STORAGE_KEY}_${currentBookId}` : STORAGE_KEY;
+  localStorage.setItem(localKey, JSON.stringify(guests));
 
   // デバッグサーバー（互換用）
   try {
@@ -208,10 +236,11 @@ async function saveGuest(guest) {
   } catch (e) {}
 
   // Supabaseに直接保存
-  if (dbClient) {
+  if (dbClient && currentBookId) {
     try {
       const dbGuest = {
         id: guest.id,
+        book_id: currentBookId, // 手帳IDを付与
         name: guest.name,
         pronunciation: guest.pronunciation || '',
         vrc_name: guest.vrcName || '',
@@ -1166,51 +1195,63 @@ async function initSupabase(url, key) {
   if (window.supabase) {
     try {
       dbClient = window.supabase.createClient(url, key);
+      
+      // 認証状態の確認
+      const { data: { session }, error: authError } = await dbClient.auth.getSession();
+      if (authError || !session) {
+        window.location.href = 'login.html';
+        return;
+      }
+      
+      // プロフィールの取得
+      const { data: profile } = await dbClient.from('member_profiles').select('*').eq('id', session.user.id).single();
+      userProfile = profile;
+
+      // book_id の確認
+      const params = new URLSearchParams(window.location.search);
+      currentBookId = params.get('book_id');
+      if (!currentBookId) {
+        window.location.href = 'portal.html';
+        return;
+      }
+      
+      // 手帳の名前を取得してタイトルに表示
+      const { data: book } = await dbClient.from('books').select('name').eq('id', currentBookId).single();
+      if (book) {
+        document.getElementById('book-title-display').textContent = book.name;
+        document.title = `VRC Cast Companion - ${book.name}`;
+      } else {
+        alert("指定された手帳が見つからないか、アクセス権限がありません。");
+        window.location.href = 'portal.html';
+        return;
+      }
+
       await loadData();
       renderGuestList();
       updateTotalCount();
       setupSupabaseRealtime();
     } catch (err) {
       console.error("Supabaseの初期化またはデータロードに失敗しました:", err);
-      // 接続情報をクリアして再設定を促す
-      localStorage.removeItem('supabase_url');
-      localStorage.removeItem('supabase_key');
-      document.getElementById('db-setup-modal').style.display = 'flex';
-      alert("Supabaseへの接続に失敗しました。以前の接続情報をクリアしますので、もう一度正しい設定を入力してください。\n\nエラー: " + err.message);
+      // セッションエラー等ならログインに戻す
+      window.location.href = 'login.html';
       throw err;
     }
   } else {
-    const errorMsg = "Supabase JS SDKがロードされていません。インターネット接続状態や、アドブロックによってSDK(cdn.jsdelivr.net)の通信がブロックされていないか確認してください。";
+    const errorMsg = "Supabase JS SDKがロードされていません。";
     console.error(errorMsg);
-    alert(errorMsg);
     // 初期化に失敗したため、ローカルモードで動作させる
+    const params = new URLSearchParams(window.location.search);
+    currentBookId = params.get('book_id') || 'default-book';
     await loadData();
     renderGuestList();
     updateTotalCount();
   }
 }
 
-// === データベース初期設定ウィザード ===
+// === データベース初期設定ウィザード (SaaS版では未使用) ===
 function setupDbWizard() {
-  const modal = document.getElementById('db-setup-modal');
-  if (!modal) return;
-  
-  const form = document.getElementById('db-setup-form');
-  const closeBtn = document.getElementById('db-setup-close');
-  
-  const url = localStorage.getItem('supabase_url');
-  const key = localStorage.getItem('supabase_key');
-  
-  if (!url || !key) {
-    if (closeBtn) closeBtn.style.display = 'none';
-    modal.style.display = 'flex';
-  } else {
-    if (closeBtn) closeBtn.style.display = 'block';
-    initSupabase(url, key).catch(() => {
-      // 起動時初期化に失敗した場合はモーダルを開く
-      modal.style.display = 'flex';
-    });
-  }
+  // ウィザード無効化
+}
   
   if (form) {
     form.addEventListener('submit', async (e) => {
@@ -1260,12 +1301,17 @@ function setupDbWizard() {
 
 // === Supabase リアルタイム同期連携 ===
 function setupSupabaseRealtime() {
-  if (!dbClient) return;
+  if (!dbClient || !currentBookId) return;
   
-  // guests テーブルの変更検知（他ブラウザからの追加・編集をリアルタイム受信）
+  // guests テーブルの変更検知（現在開いている手帳のみをフィルタ）
   dbClient
     .channel('db-guests-channel')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'guests' }, async () => {
+    .on('postgres_changes', { 
+      event: '*', 
+      schema: 'public', 
+      table: 'guests', 
+      filter: `book_id=eq.${currentBookId}` 
+    }, async () => {
       await loadData();
       renderGuestList();
       if (selectedGuestId) {

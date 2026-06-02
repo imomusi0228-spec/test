@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VRC Cast Companion - ログイン</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    /* ログイン画面特有のオーバーライドスタイル */
+    .login-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .login-card {
+      width: 100%;
+      max-width: 450px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border: 1px solid var(--panel-highlight);
+      border-radius: 24px;
+      padding: 40px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(255, 255, 255, 0.02);
+      transition: var(--transition-smooth);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-card::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle, rgba(0, 240, 255, 0.03) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .login-logo {
+      font-size: 3rem;
+      margin-bottom: 10px;
+      display: inline-block;
+      filter: drop-shadow(0 0 10px var(--color-cyan));
+      animation: logoGlow 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes logoGlow {
+      from { filter: drop-shadow(0 0 5px rgba(0, 240, 255, 0.4)); }
+      to { filter: drop-shadow(0 0 15px rgba(0, 240, 255, 0.8)); }
+    }
+
+    .login-title {
+      font-family: var(--font-eng), var(--font-main);
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: 1px;
+    }
+
+    .login-subtitle {
+      font-size: 0.9rem;
+      color: var(--text-secondary);
+      margin-top: 5px;
+    }
+
+    /* タブ切り替え */
+    .tabs-container {
+      display: flex;
+      border-bottom: 1px solid var(--panel-border);
+      margin-bottom: 25px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      padding: 12px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      text-align: center;
+      position: relative;
+    }
+
+    .tab-btn.active {
+      color: var(--color-cyan);
+      font-weight: 700;
+    }
+
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: var(--color-cyan);
+      box-shadow: 0 0 8px var(--color-cyan);
+    }
+
+    /* フォームスタイル */
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .input-wrapper {
+      position: relative;
+    }
+
+    .form-input {
+      width: 100%;
+      background: rgba(10, 10, 18, 0.5);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 12px 16px;
+      color: var(--text-primary);
+      font-size: 0.95rem;
+      transition: var(--transition-smooth);
+    }
+
+    .form-input:focus {
+      outline: none;
+      border-color: var(--color-cyan);
+      box-shadow: 0 0 10px rgba(0, 240, 255, 0.15);
+      background: rgba(10, 10, 18, 0.7);
+    }
+
+    /* ラジオボタングループ（登録タイプ） */
+    .radio-group {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 20px;
+      background: rgba(10, 10, 18, 0.3);
+      padding: 5px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.02);
+    }
+
+    .radio-option {
+      flex: 1;
+      position: relative;
+    }
+
+    .radio-option input[type="radio"] {
+      display: none;
+    }
+
+    .radio-label {
+      display: block;
+      padding: 8px 12px;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+
+    .radio-option input[type="radio"]:checked + .radio-label {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--color-purple);
+      font-weight: 700;
+      box-shadow: inset 0 0 10px rgba(189, 0, 255, 0.15);
+      border: 1px solid rgba(189, 0, 255, 0.3);
+    }
+
+    .action-btn {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 700;
+      margin-top: 10px;
+      cursor: pointer;
+      border: none;
+      background: linear-gradient(135deg, var(--color-cyan) 0%, var(--color-purple) 100%);
+      color: #fff;
+      box-shadow: var(--glow-cyan);
+      transition: var(--transition-smooth);
+    }
+
+    .action-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 25px rgba(0, 240, 255, 0.5), 0 0 25px rgba(189, 0, 255, 0.5);
+    }
+
+    .action-btn:active {
+      transform: translateY(1px);
+    }
+
+    .action-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .error-msg {
+      color: var(--color-pink);
+      font-size: 0.85rem;
+      margin-top: 15px;
+      text-align: center;
+      display: none;
+      padding: 10px;
+      background: rgba(255, 0, 122, 0.1);
+      border: 1px solid rgba(255, 0, 122, 0.2);
+      border-radius: 8px;
+    }
+
+    .success-msg {
+      color: var(--color-cyan);
+      font-size: 0.85rem;
+      margin-top: 15px;
+      text-align: center;
+      display: none;
+      padding: 10px;
+      background: rgba(0, 240, 255, 0.1);
+      border: 1px solid rgba(0, 240, 255, 0.2);
+      border-radius: 8px;
+    }
+
+    /* ローディングアニメーション */
+    .loader {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- 背景のネオン発光グラデーション -->
+  <div class="ambient-glow bg-glow-1"></div>
+  <div class="ambient-glow bg-glow-2"></div>
+
+  <div class="login-container">
+    <div class="login-card">
+      <div class="login-header">
+        <span class="login-logo">📖</span>
+        <h1 class="login-title">VRC Cast Companion</h1>
+        <p class="login-subtitle">SaaS型マルチテナント顧客名簿システム</p>
+      </div>
+
+      <div class="tabs-container">
+        <button id="tab-signin" class="tab-btn active" onclick="switchTab('signin')">サインイン</button>
+        <button id="tab-signup" class="tab-btn" onclick="switchTab('signup')">新規アカウント作成</button>
+      </div>
+
+      <!-- エラー・成功メッセージ表示領域 -->
+      <div id="error-alert" class="error-msg"></div>
+      <div id="success-alert" class="success-msg"></div>
+
+      <!-- 1. サインインフォーム -->
+      <form id="form-signin" onsubmit="handleSignIn(event)">
+        <div class="form-group">
+          <label class="form-label" for="signin-email">メールアドレス</label>
+          <input type="email" id="signin-email" class="form-input" placeholder="your-email@example.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="signin-password">パスワード</label>
+          <input type="password" id="signin-password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <button type="submit" id="btn-signin-submit" class="action-btn">
+          <span class="loading-text" id="signin-loading"><span class="loader"></span></span>
+          ログイン
+        </button>
+      </form>
+
+      <!-- 2. 新規登録フォーム -->
+      <form id="form-signup" style="display: none;" onsubmit="handleSignUp(event)">
+        <!-- 登録タイプ選択 -->
+        <label class="form-label">登録タイプ</label>
+        <div class="radio-group">
+          <div class="radio-option">
+            <input type="radio" id="role-master" name="signup-role" value="master" checked onchange="toggleSignupFields()">
+            <label for="role-master" class="radio-label">店舗オーナー</label>
+          </div>
+          <div class="radio-option">
+            <input type="radio" id="role-cast" name="signup-role" value="cast" onchange="toggleSignupFields()">
+            <label for="role-cast" class="radio-label">キャスト</label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="signup-email">メールアドレス</label>
+          <input type="email" id="signup-email" class="form-input" placeholder="your-email@example.com" required autocomplete="email">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="signup-password">パスワード（6文字以上）</label>
+          <input type="password" id="signup-password" class="form-input" placeholder="••••••••" required autocomplete="new-password" minlength="6">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="signup-display-name">お名前（店舗での表示名）</label>
+          <input type="text" id="signup-display-name" class="form-input" placeholder="例: ひな" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="signup-vrc-name">VRChat表示名</label>
+          <input type="text" id="signup-vrc-name" class="form-input" placeholder="例: Hina_VRC">
+        </div>
+
+        <!-- 店舗オーナー用フィールド -->
+        <div class="form-group" id="field-org-name">
+          <label class="form-label" for="signup-org-name">新規店舗名（グループ名）</label>
+          <input type="text" id="signup-org-name" class="form-input" placeholder="例: カフェ・ねこみみ" required>
+        </div>
+
+        <!-- キャスト用フィールド -->
+        <div class="form-group" id="field-org-id" style="display: none;">
+          <label class="form-label" for="signup-org-id">所属店舗ID（招待コード）</label>
+          <input type="text" id="signup-org-id" class="form-input" placeholder="オーナーから共有されたUUID">
+        </div>
+
+        <button type="submit" id="btn-signup-submit" class="action-btn">
+          <span class="loading-text" id="signup-loading"><span class="loader"></span></span>
+          アカウント作成
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let supabaseClient = null;
+
+    // 起動時に環境設定をAPIから取得して初期化
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const res = await fetch('/api/config');
+        if (!res.ok) throw new Error('接続設定APIの取得に失敗しました。');
+        const config = await res.json();
+        
+        if (!config.supabaseUrl || !config.supabaseKey) {
+          throw new Error('Supabaseの環境変数が設定されていません。');
+        }
+
+        // Supabaseクライアントの初期化
+        supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseKey);
+        
+        // ログイン状態であれば自動でポータルへ
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (session) {
+          window.location.href = 'portal.html';
+        }
+      } catch (err) {
+        showError('システム初期化エラー: ' + err.message);
+        document.getElementById('btn-signin-submit').disabled = true;
+        document.getElementById('btn-signup-submit').disabled = true;
+      }
+    });
+
+    // タブ切り替え
+    function switchTab(tab) {
+      clearAlerts();
+      if (tab === 'signin') {
+        document.getElementById('tab-signin').classList.add('active');
+        document.getElementById('tab-signup').classList.remove('active');
+        document.getElementById('form-signin').style.display = 'block';
+        document.getElementById('form-signup').style.display = 'none';
+      } else {
+        document.getElementById('tab-signin').classList.remove('active');
+        document.getElementById('tab-signup').classList.add('active');
+        document.getElementById('form-signin').style.display = 'none';
+        document.getElementById('form-signup').style.display = 'block';
+      }
+    }
+
+    // 登録タイプの表示切り替え
+    function toggleSignupFields() {
+      const isMaster = document.getElementById('role-master').checked;
+      const orgNameField = document.getElementById('field-org-name');
+      const orgIdField = document.getElementById('field-org-id');
+      const orgNameInput = document.getElementById('signup-org-name');
+      const orgIdInput = document.getElementById('signup-org-id');
+
+      if (isMaster) {
+        orgNameField.style.display = 'block';
+        orgNameInput.required = true;
+        orgIdField.style.display = 'none';
+        orgIdInput.required = false;
+      } else {
+        orgNameField.style.display = 'none';
+        orgNameInput.required = false;
+        orgIdField.style.display = 'block';
+        orgIdInput.required = true;
+      }
+    }
+
+    // サインイン処理
+    async function handleSignIn(e) {
+      e.preventDefault();
+      clearAlerts();
+      
+      const email = document.getElementById('signin-email').value.trim();
+      const password = document.getElementById('signin-password').value;
+      const submitBtn = document.getElementById('btn-signin-submit');
+      const loading = document.getElementById('signin-loading');
+
+      try {
+        setLoading(submitBtn, loading, true);
+        
+        const { data, error } = await supabaseClient.auth.signInWithPassword({
+          email: email,
+          password: password
+        });
+
+        if (error) throw error;
+
+        // セッション情報をローカルストレージに同期保存（app.jsとの互換用）
+        localStorage.setItem('supabase_url', supabaseClient.supabaseUrl);
+        localStorage.setItem('supabase_key', supabaseClient.supabaseKey);
+
+        showSuccess('ログインに成功しました！遷移します。');
+        setTimeout(() => {
+          window.location.href = 'portal.html';
+        }, 1000);
+
+      } catch (err) {
+        showError('ログイン失敗: ' + err.message);
+        setLoading(submitBtn, loading, false);
+      }
+    }
+
+    // サインアップ（新規登録）処理
+    async function handleSignUp(e) {
+      e.preventDefault();
+      clearAlerts();
+
+      const email = document.getElementById('signup-email').value.trim();
+      const password = document.getElementById('signup-password').value;
+      const displayName = document.getElementById('signup-display-name').value.trim();
+      const vrcName = document.getElementById('signup-vrc-name').value.trim();
+      const isMaster = document.getElementById('role-master').checked;
+      
+      const submitBtn = document.getElementById('btn-signup-submit');
+      const loading = document.getElementById('signup-loading');
+
+      // メタデータ構築
+      const metadata = {
+        display_name: displayName,
+        vrc_name: vrcName,
+        role: isMaster ? 'master' : 'cast'
+      };
+
+      if (isMaster) {
+        metadata.org_name = document.getElementById('signup-org-name').value.trim();
+      } else {
+        const orgId = document.getElementById('signup-org-id').value.trim();
+        if (!orgId) {
+          showError('キャスト登録には所属店舗ID（招待コード）が必要です。');
+          return;
+        }
+        metadata.org_id = orgId;
+      }
+
+      try {
+        setLoading(submitBtn, loading, true);
+
+        const { data, error } = await supabaseClient.auth.signUp({
+          email: email,
+          password: password,
+          options: {
+            data: metadata
+          }
+        });
+
+        if (error) throw error;
+
+        // Supabaseの設定によってはメール認証が必要
+        if (data.session === null) {
+          showSuccess('アカウントを作成しました！確認用メールを送信しましたのでメールボックスをご確認ください。');
+          setLoading(submitBtn, loading, false);
+        } else {
+          // 自動ログイン時
+          localStorage.setItem('supabase_url', supabaseClient.supabaseUrl);
+          localStorage.setItem('supabase_key', supabaseClient.supabaseKey);
+          showSuccess('アカウントを作成しログインしました！ポータルへ遷移します。');
+          setTimeout(() => {
+            window.location.href = 'portal.html';
+          }, 1500);
+        }
+
+      } catch (err) {
+        showError('登録失敗: ' + err.message);
+        setLoading(submitBtn, loading, false);
+      }
+    }
+
+    // ヘルパー関数
+    function setLoading(button, loader, isLoading) {
+      if (isLoading) {
+        button.disabled = true;
+        loader.style.display = 'inline-block';
+      } else {
+        button.disabled = false;
+        loader.style.display = 'none';
+      }
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('error-alert');
+      el.textContent = msg;
+      el.style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function showSuccess(msg) {
+      const el = document.getElementById('success-alert');
+      el.textContent = msg;
+      el.style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function clearAlerts() {
+      document.getElementById('error-alert').style.display = 'none';
+      document.getElementById('success-alert').style.display = 'none';
+    }
+  </script>
+</body>
+</html>

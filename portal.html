@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VRC Cast Companion - ポータル</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    /* ポータル画面特有のレイアウトスタイル */
+    .portal-container {
+      width: 100%;
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 0 20px;
+      z-index: 2;
+    }
+
+    .portal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--panel-bg);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--panel-highlight);
+      border-radius: 16px;
+      padding: 20px 30px;
+      margin-bottom: 30px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    }
+
+    .user-profile {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .user-avatar {
+      width: 45px;
+      height: 45px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--color-cyan) 0%, var(--color-purple) 100%);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-weight: 700;
+      font-size: 1.2rem;
+      box-shadow: var(--glow-cyan);
+    }
+
+    .user-info-text .org-name {
+      font-size: 0.8rem;
+      color: var(--color-cyan);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .user-info-text .user-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-top: 2px;
+    }
+
+    .user-info-text .user-role {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      background: rgba(255,255,255,0.05);
+      padding: 2px 8px;
+      border-radius: 20px;
+      margin-left: 5px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    /* メイングリッド */
+    .portal-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 30px;
+    }
+
+    @media (max-width: 900px) {
+      .portal-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* 各種セクションパネル */
+    .panel {
+      background: var(--panel-bg);
+      backdrop-filter: blur(25px);
+      -webkit-backdrop-filter: blur(25px);
+      border: 1px solid var(--panel-highlight);
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 15px 35px rgba(0,0,0,0.4);
+      margin-bottom: 30px;
+    }
+
+    .panel-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      border-bottom: 1px solid var(--panel-border);
+      padding-bottom: 15px;
+    }
+
+    .panel-title {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    /* 手帳カード一覧 */
+    .books-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 20px;
+    }
+
+    .book-card {
+      background: rgba(10, 10, 18, 0.4);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 24px;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 160px;
+    }
+
+    .book-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+      background: var(--color-cyan);
+      box-shadow: var(--glow-cyan);
+      transition: var(--transition-smooth);
+    }
+
+    .book-card:hover {
+      transform: translateY(-5px);
+      border-color: rgba(0, 240, 255, 0.3);
+      background: rgba(10, 10, 18, 0.6);
+      box-shadow: 0 10px 20px rgba(0, 240, 255, 0.05);
+    }
+
+    .book-card:hover::before {
+      background: var(--color-purple);
+      box-shadow: var(--glow-purple);
+      width: 6px;
+    }
+
+    .book-card-name {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+      line-height: 1.3;
+    }
+
+    .book-card-date {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: auto;
+    }
+
+    .book-card-actions {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      display: flex;
+      gap: 5px;
+      opacity: 0;
+      transition: var(--transition-smooth);
+      z-index: 10;
+    }
+
+    .book-card:hover .book-card-actions {
+      opacity: 1;
+    }
+
+    .btn-delete-book {
+      background: rgba(255, 0, 122, 0.15);
+      border: 1px solid rgba(255, 0, 122, 0.3);
+      color: var(--color-pink);
+      border-radius: 8px;
+      padding: 6px;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      font-size: 0.8rem;
+    }
+
+    .btn-delete-book:hover {
+      background: var(--color-pink);
+      color: white;
+      box-shadow: var(--glow-pink);
+    }
+
+    /* メンバー管理 / 招待関連 */
+    .invite-section {
+      background: rgba(10, 10, 18, 0.3);
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 20px;
+      border: 1px dashed var(--panel-highlight);
+    }
+
+    .invite-code-box {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .invite-code {
+      flex: 1;
+      background: rgba(0,0,0,0.4);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: var(--color-cyan);
+      overflow-x: auto;
+      border: 1px solid rgba(255,255,255,0.05);
+      white-space: nowrap;
+    }
+
+    /* メンバーリスト */
+    .member-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .member-item:last-child {
+      border-bottom: none;
+    }
+
+    .member-name-info {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .member-display-name {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .member-vrc-name {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .member-role-badge {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: bold;
+    }
+
+    .role-master {
+      background: rgba(189,0,255,0.15);
+      color: var(--color-purple);
+      border: 1px solid rgba(189,0,255,0.3);
+    }
+
+    .role-cast {
+      background: rgba(0,240,255,0.15);
+      color: var(--color-cyan);
+      border: 1px solid rgba(0,240,255,0.3);
+    }
+
+    .member-actions {
+      display: flex;
+      gap: 5px;
+    }
+
+    /* 出勤キャスト */
+    .active-cast-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+    }
+
+    .active-cast-item:last-child {
+      border-bottom: none;
+    }
+
+    .cast-status-indicator {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-cyan);
+      box-shadow: var(--glow-cyan);
+    }
+
+    /* 汎用ボタンスタイル */
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 0.8rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- 背景のネオン発光グラデーション -->
+  <div class="ambient-glow bg-glow-1"></div>
+  <div class="ambient-glow bg-glow-2"></div>
+
+  <div class="portal-container">
+    <!-- ポータルヘッダー -->
+    <header class="portal-header">
+      <div class="user-profile">
+        <div class="user-avatar" id="header-avatar">-</div>
+        <div class="user-info-text">
+          <div class="org-name" id="header-org-name">読み込み中...</div>
+          <div class="user-name">
+            <span id="header-user-name">ゲストユーザー</span>
+            <span id="header-user-role" class="user-role">キャスト</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <button onclick="handleLogout()" class="btn btn-outline">🚪 ログアウト</button>
+      </div>
+    </header>
+
+    <div class="portal-grid">
+      <!-- 左側：手帳（名簿データベース）一覧 -->
+      <main>
+        <section class="panel">
+          <div class="panel-title-row">
+            <h2 class="panel-title">📖 管理している手帳（名簿）</h2>
+            <button id="btn-create-book" class="btn btn-primary btn-sm" onclick="openCreateBookModal()" style="display: none;">
+              ＋ 新しい手帳を作成
+            </button>
+          </div>
+
+          <div id="books-list" class="books-grid">
+            <!-- JavaScriptで動的に生成 -->
+          </div>
+          
+          <div id="no-books" style="display: none; text-align: center; padding: 40px; color: var(--text-muted);">
+            登録されている手帳がありません。
+          </div>
+        </section>
+      </main>
+
+      <!-- 右側：管理パネル・本日出勤キャスト -->
+      <aside>
+        <!-- 招待コードパネル (Master限定) -->
+        <section class="panel" id="panel-invite" style="display: none;">
+          <div class="panel-title-row" style="margin-bottom: 15px; padding-bottom: 10px;">
+            <h3 class="panel-title" style="font-size: 1.1rem;">🔑 店舗ID（キャスト招待コード）</h3>
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4;">
+            キャストの方にアカウント登録してもらう際、このIDを入力するように伝えてください。
+          </p>
+          <div class="invite-section">
+            <span style="font-size: 0.75rem; color: var(--text-muted); font-weight: bold;">店舗ID（クリックでコピー）:</span>
+            <div class="invite-code-box">
+              <div id="org-id-display" class="invite-code" onclick="copyOrgId()">取得中...</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 本日の出勤キャスト -->
+        <section class="panel">
+          <div class="panel-title-row" style="margin-bottom: 15px; padding-bottom: 10px;">
+            <h3 class="panel-title" style="font-size: 1.1rem;">🌟 本日の出勤キャスト</h3>
+          </div>
+          <div id="active-casts-list">
+            <!-- JavaScriptで動的に生成 -->
+          </div>
+          <div id="no-active-casts" style="display: none; text-align: center; padding: 20px; color: var(--text-muted); font-size: 0.85rem;">
+            本日出勤のキャストはいません。
+          </div>
+        </section>
+
+        <!-- メンバー管理パネル (Master限定) -->
+        <section class="panel" id="panel-members" style="display: none;">
+          <div class="panel-title-row" style="margin-bottom: 15px; padding-bottom: 10px;">
+            <h3 class="panel-title" style="font-size: 1.1rem;">👥 キャスト（メンバー）管理</h3>
+          </div>
+          <div id="members-list">
+            <!-- JavaScriptで動的に生成 -->
+          </div>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <!-- トースト通知 -->
+  <div id="toast" class="toast"></div>
+
+  <!-- 新規手帳作成モーダル -->
+  <div id="create-book-modal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3 class="modal-title">📖 新しい手帳を作成</h3>
+        <button class="close-btn" onclick="closeCreateBookModal()">×</button>
+      </div>
+      <div class="modal-body" style="padding-top: 15px;">
+        <div class="form-group">
+          <label class="form-label" for="new-book-name">手帳の名前</label>
+          <input type="text" id="new-book-name" class="form-input" placeholder="例: 1号店名簿, イベント用" required>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeCreateBookModal()">キャンセル</button>
+        <button class="btn btn-primary" onclick="handleCreateBook()">作成する</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let supabaseClient = null;
+    let currentUser = null;
+    let userProfile = null;
+    let userOrg = null;
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await initPortal();
+    });
+
+    async function initPortal() {
+      try {
+        // 設定読み込み
+        const res = await fetch('/api/config');
+        if (!res.ok) throw new Error('接続設定の取得に失敗しました。');
+        const config = await res.json();
+        
+        supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseKey);
+
+        // ログインセッションの確認
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (!session) {
+          window.location.href = 'login.html';
+          return;
+        }
+
+        currentUser = session.user;
+
+        // ユーザープロフィールの取得
+        const { data: profile, error: profileError } = await supabaseClient
+          .from('member_profiles')
+          .select('*')
+          .eq('id', currentUser.id)
+          .single();
+
+        if (profileError || !profile) {
+          throw new Error('ユーザープロフィールの取得に失敗しました。再度ログインしてください。');
+        }
+
+        userProfile = profile;
+
+        // 組織情報の取得
+        const { data: org, error: orgError } = await supabaseClient
+          .from('organizations')
+          .select('*')
+          .eq('id', profile.org_id)
+          .single();
+
+        if (orgError) throw orgError;
+        userOrg = org;
+
+        // UIヘッダーの反映
+        document.getElementById('header-avatar').textContent = (profile.display_name || 'G').charAt(0).toUpperCase();
+        document.getElementById('header-org-name').textContent = org.name;
+        document.getElementById('header-user-name').textContent = profile.display_name;
+        
+        const roleBadge = document.getElementById('header-user-role');
+        roleBadge.textContent = profile.role === 'master' ? 'マスター（管理者）' : 'キャスト';
+        roleBadge.className = `user-role role-${profile.role}`;
+
+        // 権限に応じたUI制御
+        if (profile.role === 'master') {
+          document.getElementById('btn-create-book').style.display = 'block';
+          document.getElementById('panel-invite').style.display = 'block';
+          document.getElementById('panel-members').style.display = 'block';
+          document.getElementById('org-id-display').textContent = profile.org_id;
+          
+          await loadMembers();
+        }
+
+        // 手帳一覧と出勤キャストの読み込み
+        await loadBooks();
+        await loadActiveCasts();
+
+      } catch (err) {
+        console.error(err);
+        alert(err.message);
+        handleLogout();
+      }
+    }
+
+    // 手帳一覧の読み込み
+    async function loadBooks() {
+      const listContainer = document.getElementById('books-list');
+      const noBooks = document.getElementById('no-books');
+      listContainer.innerHTML = '';
+
+      try {
+        const { data: books, error } = await supabaseClient
+          .from('books')
+          .select('*')
+          .order('created_at', { ascending: true });
+
+        if (error) throw error;
+
+        if (!books || books.length === 0) {
+          noBooks.style.display = 'block';
+          return;
+        }
+
+        noBooks.style.display = 'none';
+
+        books.forEach(book => {
+          const card = document.createElement('div');
+          card.className = 'book-card';
+          card.onclick = () => window.location.href = `index.html?book_id=${book.id}`;
+
+          const date = new Date(book.created_at).toLocaleDateString('ja-JP', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+          });
+
+          let actionsHTML = '';
+          if (userProfile.role === 'master') {
+            actionsHTML = `
+              <div class="book-card-actions" onclick="event.stopPropagation();">
+                <button class="btn-delete-book" title="手帳を削除" onclick="handleDeleteBook('${book.id}', '${escapeHTML(book.name)}')">🗑️ 削除</button>
+              </div>
+            `;
+          }
+
+          card.innerHTML = `
+            <div class="book-card-name">${escapeHTML(book.name)}</div>
+            <div class="book-card-date">作成日: ${date}</div>
+            ${actionsHTML}
+          `;
+
+          listContainer.appendChild(card);
+        });
+
+      } catch (err) {
+        showToast('手帳一覧の取得に失敗しました: ' + err.message);
+      }
+    }
+
+    // 新規手帳の作成
+    function openCreateBookModal() {
+      document.getElementById('new-book-name').value = '';
+      document.getElementById('create-book-modal').style.display = 'flex';
+    }
+
+    function closeCreateBookModal() {
+      document.getElementById('create-book-modal').style.display = 'none';
+    }
+
+    async function handleCreateBook() {
+      const input = document.getElementById('new-book-name');
+      const name = input.value.trim();
+      if (!name) {
+        alert('手帳の名前を入力してください。');
+        return;
+      }
+
+      try {
+        const { data, error } = await supabaseClient
+          .from('books')
+          .insert({
+            org_id: userProfile.org_id,
+            name: name
+          })
+          .select();
+
+        if (error) throw error;
+
+        showToast(`手帳「${name}」を作成しました！`);
+        closeCreateBookModal();
+        await loadBooks();
+
+      } catch (err) {
+        alert('手帳の作成に失敗しました: ' + err.message);
+      }
+    }
+
+    // 手帳の削除
+    async function handleDeleteBook(bookId, bookName) {
+      if (!confirm(`本当に手帳「${bookName}」を削除しますか？\nこの手帳内のすべての顧客データも完全に削除されます。この操作は取り消せません。`)) {
+        return;
+      }
+
+      try {
+        const { error } = await supabaseClient
+          .from('books')
+          .delete()
+          .eq('id', bookId);
+
+        if (error) throw error;
+
+        showToast(`手帳「${bookName}」を削除しました。`);
+        await loadBooks();
+        await loadActiveCasts(); // 出勤キャストデータの再読み込み
+
+      } catch (err) {
+        alert('手帳の削除に失敗しました: ' + err.message);
+      }
+    }
+
+    // メンバー（キャスト）一覧の読み込み
+    async function loadMembers() {
+      const listContainer = document.getElementById('members-list');
+      listContainer.innerHTML = '';
+
+      try {
+        const { data: members, error } = await supabaseClient
+          .from('member_profiles')
+          .select('*')
+          .eq('org_id', userProfile.org_id)
+          .order('role', { ascending: true })
+          .order('display_name', { ascending: true });
+
+        if (error) throw error;
+
+        members.forEach(member => {
+          const item = document.createElement('div');
+          item.className = 'member-item';
+
+          const isSelf = member.id === currentUser.id;
+          let actionsHTML = '';
+          
+          if (!isSelf) {
+            const nextRole = member.role === 'master' ? 'cast' : 'master';
+            const actionLabel = member.role === 'master' ? 'キャストに降格' : 'マスターに昇格';
+            actionsHTML = `
+              <div class="member-actions">
+                <button class="btn btn-outline btn-sm" onclick="changeMemberRole('${member.id}', '${nextRole}')">${actionLabel}</button>
+                <button class="btn btn-outline btn-sm btn-delete-book" style="padding: 4px 8px;" onclick="removeMember('${member.id}', '${escapeHTML(member.display_name)}')">除外</button>
+              </div>
+            `;
+          }
+
+          item.innerHTML = `
+            <div class="member-name-info">
+              <span class="member-display-name">
+                ${escapeHTML(member.display_name)} ${isSelf ? ' (あなた)' : ''}
+                <span class="member-role-badge role-${member.role}">${member.role === 'master' ? 'マスター' : 'キャスト'}</span>
+              </span>
+              <span class="member-vrc-name">VRC: ${escapeHTML(member.vrc_name || '未設定')}</span>
+            </div>
+            ${actionsHTML}
+          `;
+
+          listContainer.appendChild(item);
+        });
+
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // メンバー権限の変更
+    async function changeMemberRole(memberId, newRole) {
+      try {
+        const { error } = await supabaseClient
+          .from('member_profiles')
+          .update({ role: newRole })
+          .eq('id', memberId);
+
+        if (error) throw error;
+
+        showToast('メンバーの権限を更新しました。');
+        await loadMembers();
+
+      } catch (err) {
+        alert('権限の変更に失敗しました: ' + err.message);
+      }
+    }
+
+    // メンバーの組織からの除外
+    async function removeMember(memberId, name) {
+      if (!confirm(`本当に「${name}」さんを店舗から除外しますか？\n除外するとこの店舗の手帳や顧客データにアクセスできなくなります。`)) {
+        return;
+      }
+
+      try {
+        // member_profiles の org_id を null にし、roleをcastにする（組織への所属を剥奪）
+        const { error } = await supabaseClient
+          .from('member_profiles')
+          .delete() // 実際は削除でも、またはupdate org_id = null でもよい。削除ポリシーにより削除可能。
+          .eq('id', memberId);
+
+        if (error) throw error;
+
+        showToast(`${name} さんを除外しました。`);
+        await loadMembers();
+
+      } catch (err) {
+        alert('メンバーの除外に失敗しました: ' + err.message);
+      }
+    }
+
+    // 本日の出勤キャスト一覧の読み込み
+    async function loadActiveCasts() {
+      const container = document.getElementById('active-casts-list');
+      const noCasts = document.getElementById('no-active-casts');
+      container.innerHTML = '';
+
+      try {
+        // 同じ org_id のすべての手帳のIDを取得
+        const { data: books, error: booksError } = await supabaseClient
+          .from('books')
+          .select('id');
+
+        if (booksError) throw booksError;
+
+        if (!books || books.length === 0) {
+          noCasts.style.display = 'block';
+          return;
+        }
+
+        const bookIds = books.map(b => b.id);
+
+        // その手帳に属する guests のうち、is_cast = true かつ is_active_today = true のメンバーを引く
+        const { data: activeGuests, error: guestsError } = await supabaseClient
+          .from('guests')
+          .select('name, vrc_name')
+          .in('book_id', bookIds)
+          .eq('is_cast', true)
+          .eq('is_active_today', true);
+
+        if (guestsError) throw guestsError;
+
+        // 名前の重複排除（別手帳に同じキャストが登録されている可能性があるため）
+        const uniqueCasts = [];
+        const seenNames = new Set();
+
+        if (activeGuests) {
+          activeGuests.forEach(g => {
+            if (!seenNames.has(g.name.toLowerCase())) {
+              seenNames.add(g.name.toLowerCase());
+              uniqueCasts.push(g);
+            }
+          });
+        }
+
+        if (uniqueCasts.length === 0) {
+          noCasts.style.display = 'block';
+          return;
+        }
+
+        noCasts.style.display = 'none';
+
+        uniqueCasts.forEach(cast => {
+          const item = document.createElement('div');
+          item.className = 'active-cast-item';
+          item.innerHTML = `
+            <div class="cast-status-indicator"></div>
+            <div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-primary);">${escapeHTML(cast.name)}</div>
+              <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 1px;">VRC: ${escapeHTML(cast.vrc_name || '未設定')}</div>
+            </div>
+          `;
+          container.appendChild(item);
+        });
+
+      } catch (err) {
+        console.error('出勤キャスト取得エラー:', err);
+      }
+    }
+
+    // ログアウト処理
+    async function handleLogout() {
+      if (supabaseClient) {
+        await supabaseClient.auth.signOut();
+      }
+      localStorage.removeItem('supabase_url');
+      localStorage.removeItem('supabase_key');
+      window.location.href = 'login.html';
+    }
+
+    // 組織IDのコピー
+    function copyOrgId() {
+      const orgId = document.getElementById('org-id-display').textContent;
+      if (orgId && orgId !== '取得中...') {
+        navigator.clipboard.writeText(orgId).then(() => {
+          showToast('店舗IDをクリップボードにコピーしました！');
+        }).catch(err => {
+          alert('コピーに失敗しました: ' + err);
+        });
+      }
+    }
+
+    // トースト表示ヘルパー
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.style.display = 'none';
+      void toast.offsetWidth; // リフロー
+      toast.textContent = message;
+      toast.style.display = 'block';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 3000);
+    }
+
+    // エスケープ処理
+    function escapeHTML(str) {
+      if (!str) return '';
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+</html>

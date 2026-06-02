@@ -229,41 +229,153 @@
         3. プロジェクトが作成されたら、左メニューの <b>SQL Editor</b> を開き、<b>New Query</b> をクリックします。<br>
         4. 以下のSQL文をすべてコピーして貼り付け、右下の <b>Run</b> ボタンをクリックして実行します。
       </p>
-      <pre><code>-- guests（顧客台帳）テーブルの作成
-create table if not exists guests (
-  id text primary key,
-  name text not null,
-  pronunciation text,
-  vrc_name text,
-  x_id text,
-  discord_id text,
-  first_visit text,
-  last_visit text,
-  visit_count integer default 1,
-  is_cast boolean default false,
-  is_active_today boolean default false,
-  tags text[] default '{}',
-  characteristics text,
-  notes jsonb default '[]'::jsonb
+      <pre><code>-- 1. organizations（店舗・グループ）テーブル作成
+CREATE TABLE IF NOT EXISTS public.organizations (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    name text NOT NULL,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 既存のデータベースがある場合、カラムが存在しなければ追加する
-alter table guests add column if not exists is_cast boolean default false;
-alter table guests add column if not exists is_active_today boolean default false;
+-- 2. member_profiles（メンバーアカウント）テーブル作成
+CREATE TABLE IF NOT EXISTS public.member_profiles (
+    id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    org_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
+    display_name text,
+    vrc_name text,
+    role text NOT NULL CHECK (role IN ('master', 'cast')) DEFAULT 'cast',
+    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
 
--- realtime_events（入室・記名通知）テーブルの作成
-create table if not exists realtime_events (
+-- 3. books（手帳データベース）テーブル作成
+CREATE TABLE IF NOT EXISTS public.books (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
+    name text NOT NULL,
+    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 4. guests テーブルの移行・修正
+ALTER TABLE public.guests ADD COLUMN IF NOT EXISTS book_id uuid REFERENCES public.books(id) ON DELETE CASCADE;
+
+-- [既存データ移行] すでに guests があり、かつ book_id が未設定の場合のマイグレーション処理
+DO $$
+DECLARE
+    default_org_id uuid;
+    default_book_id uuid;
+BEGIN
+    IF EXISTS (SELECT 1 FROM public.guests WHERE book_id IS NULL) THEN
+        INSERT INTO public.organizations (name) VALUES ('デフォルト店舗') RETURNING id INTO default_org_id;
+        INSERT INTO public.books (org_id, name) VALUES (default_org_id, 'デフォルト手帳') RETURNING id INTO default_book_id;
+        UPDATE public.guests SET book_id = default_book_id WHERE book_id IS NULL;
+    END IF;
+END $$;
+
+-- book_id の必須化
+ALTER TABLE public.guests ALTER COLUMN book_id SET NOT NULL;
+
+-- 5. realtime_events テーブルの作成・移行
+CREATE TABLE IF NOT EXISTS public.realtime_events (
   id bigint generated always as identity primary key,
+  org_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE,
   type text not null,
   player_name text,
   comment text,
   visit_count integer,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+ALTER TABLE public.realtime_events ADD COLUMN IF NOT EXISTS org_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE;
 
--- リアルタイム配信（レプリケーション）を有効化
-alter publication supabase_realtime add table guests;
-alter publication supabase_realtime add table realtime_events;</code></pre>
+-- 6. 行レベルセキュリティ（RLS）の有効化
+ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.member_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.books ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.guests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.realtime_events ENABLE ROW LEVEL SECURITY;
+
+-- 7. セキュリティヘルパー関数の定義
+CREATE OR REPLACE FUNCTION public.get_user_org_id()
+RETURNS uuid AS $$
+    SELECT org_id FROM public.member_profiles WHERE id = auth.uid();
+$$ LANGUAGE sql SECURITY DEFINER;
+
+CREATE OR REPLACE FUNCTION public.get_user_role()
+RETURNS text AS $$
+    SELECT role FROM public.member_profiles WHERE id = auth.uid();
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- 8. RLSポリシーの定義
+-- member_profiles
+CREATE POLICY "所属する組織のメンバープロフィールを参照可能" ON public.member_profiles
+    FOR SELECT USING (org_id = public.get_user_org_id());
+
+CREATE POLICY "自分自身のプロフィールは更新可能" ON public.member_profiles
+    FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "マスターはメンバーを管理可能" ON public.member_profiles
+    FOR ALL USING (org_id = public.get_user_org_id() AND public.get_user_role() = 'master');
+
+-- organizations
+CREATE POLICY "所属する組織情報のみ参照可能" ON public.organizations
+    FOR SELECT USING (id = public.get_user_org_id());
+
+-- books
+CREATE POLICY "所属組織の手帳のみ参照可能" ON public.books
+    FOR SELECT USING (org_id = public.get_user_org_id());
+
+CREATE POLICY "マスターは手帳を管理可能" ON public.books
+    FOR ALL USING (org_id = public.get_user_org_id() AND public.get_user_role() = 'master');
+
+-- guests
+CREATE POLICY "所属組織の手帳の顧客のみ参照可能" ON public.guests
+    FOR SELECT USING (book_id IN (SELECT id FROM public.books WHERE org_id = public.get_user_org_id()));
+
+CREATE POLICY "所属組織の手帳の顧客データを管理可能" ON public.guests
+    FOR ALL USING (book_id IN (SELECT id FROM public.books WHERE org_id = public.get_user_org_id()));
+
+-- realtime_events
+CREATE POLICY "所属組織のイベントのみ参照可能" ON public.realtime_events
+    FOR SELECT USING (org_id = public.get_user_org_id());
+
+CREATE POLICY "匿名ユーザーからのイベント挿入を許可" ON public.realtime_events
+    FOR INSERT WITH CHECK (true);
+
+-- 9. 新規ユーザー作成時に自動で member_profiles を作成する PostgreSQL トリガー
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger AS $$
+DECLARE
+    target_org_id uuid;
+    user_role text;
+    org_name_val text;
+BEGIN
+    user_role := coalesce(new.raw_user_meta_data->>'role', 'master');
+    
+    IF new.raw_user_meta_data->>'org_id' IS NOT NULL THEN
+        target_org_id := (new.raw_user_meta_data->>'org_id')::uuid;
+    ELSE
+        org_name_val := coalesce(new.raw_user_meta_data->>'org_name', '新規店舗');
+        INSERT INTO public.organizations (name) VALUES (org_name_val) RETURNING id INTO target_org_id;
+        user_role := 'master';
+    END IF;
+
+    INSERT INTO public.member_profiles (id, org_id, display_name, vrc_name, role)
+    VALUES (
+        new.id,
+        target_org_id,
+        coalesce(new.raw_user_meta_data->>'display_name', split_part(new.email, '@', 1)),
+        coalesce(new.raw_user_meta_data->>'vrc_name', ''),
+        user_role
+    );
+    RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- 10. リアルタイム配信（レプリケーション）を有効化
+ALTER PUBLICATION supabase_realtime ADD TABLE public.guests;
+ALTER PUBLICATION supabase_realtime ADD TABLE public.realtime_events;</code></pre>
 
       <h3 style="margin-top: 25px; color: var(--color-cyan); border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 8px;">🔑 接続情報（Project ID と APIキー）の取得手順</h3>
       <p>WebダッシュボードやUnity（VRChat）と接続するためのIDとキーをコピーします：</p>
@@ -322,7 +434,7 @@ alter publication supabase_realtime add table realtime_events;</code></pre>
       <p>
         1. Unityプロジェクトに <code>1_UnityAssets/VRCGuestBook.cs</code> をインポートします（UdonSharp Behaviourとして自動変換されます）。<br>
         2. ワールド内に名簿UI（本モデル、入力UI、表示UI）を配置し、Udon Behaviourをアタッチします。<br>
-        3. Udon Behaviour内の変数設定にて、<b>Base Url</b> に <code>Vercelの公開URL/api</code>（例: <code>https://your-app.vercel.app/api</code>）を設定します。<br>
+        3. Udon Behaviour内の変数設定にて、<b>Base Url</b> に <code>Vercelの公開URL/api/join?book_id=手帳ID</code> （例: <code>https://your-app.vercel.app/api/join?book_id=xxxx-xxxx-xxxx-xxxx</code>）を設定します。マルチテナント化に伴い、どの手帳に顧客を登録するかを識別するために、必ずポータル画面で作成した手帳IDを <b><code>?book_id=xxx</code></b> の形式でURLの末尾に付与してください。<br>
         4. 以下のセキュリティおよびパネル変数を設定します：
       </p>
       <ul>

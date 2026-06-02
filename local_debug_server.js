@@ -118,6 +118,16 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Webダッシュボード用API: Supabase設定取得
+  if (pathname === '/api/config' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({
+      supabaseUrl: process.env.SUPABASE_URL || '',
+      supabaseKey: process.env.SUPABASE_KEY || ''
+    }));
+    return;
+  }
+
   // 2. Webダッシュボード用API: 全顧客取得
   if (pathname === '/api/guests' && req.method === 'GET') {
     const guests = readDatabase();
