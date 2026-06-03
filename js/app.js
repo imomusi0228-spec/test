@@ -768,7 +768,7 @@ async function handleGuestFormSubmit(e) {
   } else {
     // 新規追加
     const newGuest = {
-      id: 'guest-' + Date.now(),
+      id: generateUUID(),
       name,
       pronunciation,
       vrcName,
@@ -952,7 +952,7 @@ function importData() {
         const isValid = importedData.every(item => item && typeof item.name === 'string');
         if (isValid) {
           guests = importedData.map(item => ({
-            id: item.id || ('guest-' + Date.now() + Math.random().toString(36).substr(2, 5)),
+            id: (item.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id)) ? item.id : generateUUID(),
             name: item.name,
             pronunciation: item.pronunciation || '',
             vrcName: item.vrcName || '',
@@ -994,7 +994,7 @@ function generateDemoData() {
     return;
   }
   
-  guests = [...guests, ...newDemoData.map(d => ({...d, id: 'guest-demo-' + Date.now() + Math.random().toString(36).substring(2, 4)}))];
+  guests = [...guests, ...newDemoData.map(d => ({...d, id: generateUUID()}))];
   saveData();
   renderGuestList();
   closeSettingsModal();
@@ -1512,7 +1512,7 @@ async function importCsvData() {
         } else {
           // 新規追加
           const newGuest = {
-            id: 'guest-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+            id: generateUUID(),
             ...guestData
           };
           guests.push(newGuest);
@@ -1586,4 +1586,15 @@ function parseCSV(text) {
   }
   
   return lines;
+}
+
+// UUIDv4の生成 (ブラウザ互換)
+function generateUUID() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 }
