@@ -204,8 +204,8 @@
 
     <h2>1. System Overview (システム概要)</h2>
     <p>
-      この度は「VRC Cast Companion」をご購入いただきありがとうございます。<br>
-      本システムは、<b>VRChatワールド内に設置する3D芳名帳</b>と、キャストが手元（ブラウザ・スマホ）で確認する<b>顧客管理Webダッシュボード</b>を、無料のクラウドベース（Supabase / Vercel）でリアルタイムに同期・連携させるアセットパッケージです。
+      この度は「VRC Cast Companion」をご利用いただきありがとうございます。<br>
+      本システムは、<b>VRChatワールド内に設置する3D芳名帳</b>と、キャストが手元（ブラウザ・スマホ）で確認する<b>顧客管理Webダッシュボード</b>をリアルタイムに同期・連携させるアセットパッケージです。
     </p>
 
     <div class="alert">
@@ -213,7 +213,6 @@
       <p>
         ・ゲストがワールドに入室した瞬間に自動検知。<b>PC起動などの手間は一切なく</b>、自動で来店回数が+1されます。<br>
         ・入室と同時に、キャストのWeb画面が<b>自動的にそのゲストのカルテページに切り替わります</b>。<br>
-        ・ご自身専用のデータベースを構築するため、情報漏洩や消失の心配がなく、永久無料URLで運用可能です。<br>
         ・ワールド内名簿には<b>暗証番号（パスコード）ロック機能</b>があり、一般ゲストからのデータ覗き見を防ぎます。
       </p>
     </div>
@@ -222,164 +221,47 @@
 
     <div class="step-box">
       <span class="step-num">1</span>
-      <span class="step-title">データベース（Supabase）の作成と接続情報の取得</span>
+      <span class="step-title">顧客管理ポータルでのアカウント作成と手帳ID（Book ID）の取得</span>
       <p>
-        1. <a href="https://supabase.com" target="_blank">Supabase (https://supabase.com)</a> にアクセスし、無料アカウントを作成します。<br>
-        2. 新しいプロジェクトを作成します（データベースのパスワードは紛失しないよう控えてください）。<br>
-        3. プロジェクトが作成されたら、左メニューの <b>SQL Editor</b> を開き、<b>New Query</b> をクリックします。<br>
-        4. 以下のSQL文をすべてコピーして貼り付け、右下の <b>Run</b> ボタンをクリックして実行します。
+        1. 顧客管理ポータル（<a href="https://test-sepia-three-75.vercel.app" target="_blank">https://test-sepia-three-75.vercel.app</a>）にアクセスし、新規アカウント登録（無料）を行います。<br>
+        2. ログイン後、ダッシュボードの「手帳管理」画面より「新しい手帳」を作成します。<br>
+        3. 作成された手帳の一覧に表示されている <b>手帳ID（Book ID）</b> をコピーします。（このIDがVRChatワールドとデータベースを紐付けるキーになります）
       </p>
-      <pre><code>-- 1. organizations（店舗・グループ）テーブル作成
-CREATE TABLE IF NOT EXISTS public.organizations (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    name text NOT NULL,
-    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 2. member_profiles（メンバーアカウント）テーブル作成
-CREATE TABLE IF NOT EXISTS public.member_profiles (
-    id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-    org_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
-    display_name text,
-    vrc_name text,
-    role text NOT NULL CHECK (role IN ('master', 'cast')) DEFAULT 'cast',
-    updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 3. books（手帳データベース）テーブル作成
-CREATE TABLE IF NOT EXISTS public.books (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    org_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE NOT NULL,
-    name text NOT NULL,
-    created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
-);
-
--- 4. guests テーブルの移行・修正
-ALTER TABLE public.guests ADD COLUMN IF NOT EXISTS book_id uuid REFERENCES public.books(id) ON DELETE CASCADE;
-
--- [既存データ移行] すでに guests があり、かつ book_id が未設定の場合のマイグレーション処理
-DO $$
-DECLARE
-    default_org_id uuid;
-    default_book_id uuid;
-BEGIN
-    IF EXISTS (SELECT 1 FROM public.guests WHERE book_id IS NULL) THEN
-        INSERT INTO public.organizations (name) VALUES ('デフォルト店舗') RETURNING id INTO default_org_id;
-        INSERT INTO public.books (org_id, name) VALUES (default_org_id, 'デフォルト手帳') RETURNING id INTO default_book_id;
-        UPDATE public.guests SET book_id = default_book_id WHERE book_id IS NULL;
-    END IF;
-END $$;
-
--- book_id の必須化
-ALTER TABLE public.guests ALTER COLUMN book_id SET NOT NULL;
-
--- 5. realtime_events テーブルの作成・移行
-CREATE TABLE IF NOT EXISTS public.realtime_events (
-  id bigint generated always as identity primary key,
-  org_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE,
-  type text not null,
-  player_name text,
-  comment text,
-  visit_count integer,
-  created_at timestamp with time zone default timezone('utc'::text, now()) not null
-);
-ALTER TABLE public.realtime_events ADD COLUMN IF NOT EXISTS org_id uuid REFERENCES public.organizations(id) ON DELETE CASCADE;
-
-
-
--- 9. リアルタイム配信（レプリケーション）を有効化
-ALTER PUBLICATION supabase_realtime ADD TABLE public.guests;
-ALTER PUBLICATION supabase_realtime ADD TABLE public.realtime_events;</code></pre>
-
-      <h3 style="margin-top: 25px; color: var(--color-cyan); border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 8px;">🔑 接続情報（Project ID と APIキー）の取得手順</h3>
-      <p>WebダッシュボードやUnity（VRChat）と接続するためのIDとキーをコピーします：</p>
-      <ol style="padding-left: 20px; margin-bottom: 15px; display: flex; flex-direction: column; gap: 10px;">
-        <li>画面左端にある黒い縦一列のメニューの最下部付近にある <b>⚙️（Project Settings / 歯車マーク）</b> をクリックします。</li>
-        <li>
-          <b>プロジェクトURL（Project URL）のコピー：</b><br>
-          歯車マークをクリックすると右側に現れるメニューの一番上にある <b>General</b> をクリックします。<br>
-          画面中央の <b>General Settings</b> 欄にある <b>Project URL</b>（または <b>API Endpoint</b>）の右側にある <b>[Copy]（📋）</b> ボタンをクリックしてコピーします。
-        </li>
-        <li>
-          <b>APIキー（anon public key）のコピー：</b><br>
-          同じメニュー内にある <b>API Keys</b> をクリックします。<br>
-          画面中央の <b>Publishable key</b> 欄にある <code>default</code> の右側（<code>sb.publishable_...</code>）の <b>[Copy]（📋）</b> ボタンをクリックしてコピーします。<br>
-          <span style="color: #ff5e62; font-size: 12px; font-weight: 500;">※注意：下にある「Secret keys」は管理者用の秘密鍵ですので、絶対に使用しないでください。</span>
-        </li>
-        <li style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px;">
-          <b style="color: var(--color-cyan);">🔑 サーバー用管理特権キー（service_role）の取得手順：</b><br>
-          セキュアなサインアップAPIを動作させるために、お嬢（開発者・サービス運営者）は以下の管理特権キーもコピーしてVercelの環境変数に登録する必要があります。<br>
-          1. 接続情報の <b>API Keys</b> 画面を開きます（anon public keyと同じ場所です）。<br>
-          2. 画面下部にある <b>Secret keys</b> 欄の <code>service_role</code>（または <code>service_role_key</code>）の右側にある <b>[Copy]（📋）</b> ボタンをクリックしてコピーします。<br>
-          <span style="color: #ff5e62; font-size: 12px; font-weight: 500;">※注意：このキーは全権限を持つ非常に強力なキーですので、絶対にフロントエンドのソースコード上にハードコードしたり、他人に教えたりしないでください（Vercelの環境変数にのみ設定します）。</span>
-        </li>
-      </ol>
     </div>
 
     <div class="step-box">
       <span class="step-num">2</span>
-      <span class="step-title">Webアプリのクラウド公開（Vercelデプロイ）</span>
-      <p>サーバーやプログラムの知識がなくても、以下のいずれかの方法で簡単にインターネット上へ自分専用の名簿ダッシュボードを公開（デプロイ）できます。どちらも完全無料で利用可能です。</p>
-      
-      <h3>【方法A】1クリックでデプロイ（最も簡単・おすすめ）</h3>
-      <p>以下のボタンをクリックすると、GitHubへのコピー作成からVercelへの公開までをほぼ自動で行えます。</p>
+      <span class="step-title">Unity（VRChatワールド）への自動導入</span>
       <p>
-        1. 下記の「Deploy to Vercel」ボタンをクリックし、画面の指示に従ってGitHubおよびVercelの無料アカウントを作成・ログインします。<br>
-        2. リポジトリ作成画面が出たら、任意の名前（例: <code>vrc-cast-companion</code>）を入力して「Create」を押します。<br>
-        3. 途中で**「Configure Project（プロジェクト設定）」**の画面が表示されたら、<b>Environment Variables（環境変数）</b>の入力欄に、Step 1で取得したSupabaseの値を入力します：
+        1. 配布された <code>1_UnityAssets</code> フォルダを、Unityプロジェクトの <code>Assets</code> フォルダ配下へドラッグ＆ドロップしてインポートします。<br>
+        2. Unityの上部メニューバーに追加される <b>VRC Cast Companion ➔ セットアップウィンドウ</b> をクリックして開きます。<br>
+        3. 開いたウィンドウに、以下の設定項目を入力します：
       </p>
       <ul>
-        <li><code>SUPABASE_URL</code> : Supabaseの <b>Project URL</b>（例：<code>https://[あなたのProject ID].supabase.co</code>）を入力</li>
-        <li><code>SUPABASE_KEY</code> : Supabaseの <b>anon public API Key</b>（公開キー）を入力</li>
-        <li><code>SUPABASE_SERVICE_ROLE_KEY</code> : Supabaseの <b>service_role key</b>（特権管理者キー。※Secret keys欄のキーです）を入力</li>
+        <li><b>API Base URL</b> : 初期設定のままで問題ありません（<code>https://test-sepia-three-75.vercel.app/api</code>）。</li>
+        <li><b>Book ID</b> : Step 1でコピーした <b>手帳ID（Book ID）</b> を入力します。</li>
+        <li><b>Passcode</b> : ワールド内でキャスト専用の名簿閲覧画面を開くための任意の <b>暗証番号（4桁 of 数字など）</b> を入力します。</li>
       </ul>
       <p>
-        4. 「Deploy」ボタンを押すと、数十秒で公開URL（例：<code>https://your-name.vercel.app</code>）が完成します！
-      </p>
-      <p>
-        <a href="https://vercel.com/new/clone?repository-url=https://github.com/dansy/vrc-cast-companion" target="_blank" class="btn">Deploy to Vercel</a>
-      </p>
-
-      <h3>【方法B】手動でGitHubにアップロードしてデプロイ</h3>
-      <p>
-        1. 無料の <a href="https://github.com" target="_blank">GitHub</a> アカウントを作成し、新規リポジトリを作成します。<br>
-        2. 本製品の <code>2_WebDashboard/</code> フォルダ内のすべてのファイルを、作成したGitHubリポジトリにアップロード（プッシュ）します。（※VSCodeのGit機能や、GitHub Desktopアプリなどを使うとドラッグ＆ドロップ感覚で簡単です）<br>
-        3. <a href="https://vercel.com" target="_blank">Vercel</a> にログインし、「Add New ➔ Project」から先ほどアップロードしたGitHubリポジトリをインポートします。<br>
-        4. 設定画面の「Environment Variables」欄に、上記と同様に <code>SUPABASE_URL</code> と <code>SUPABASE_KEY</code> の2つを登録します。<br>
-        5. 「Deploy」ボタンを押せば、数十秒後に公開URLが生成されます。
+        4. <b>「自動セットアップを実行」</b> ボタンをクリックします。<br>
+        これにより、シーン上のタブレット（Tablet）オブジェクトの上に美しくデザインされた「名簿UI画面(Canvas)」が自動設置され、スクリプトの変数アタッチやボタンイベントの紐付けがすべて自動で完了します。
       </p>
     </div>
 
     <div class="step-box">
       <span class="step-num">3</span>
-      <span class="step-title">Unity（VRChatワールド）への導入</span>
+      <span class="step-title">ワールドのアップロード</span>
       <p>
-        1. Unityプロジェクトに <code>1_UnityAssets/VRCGuestBook.cs</code> をインポートします（UdonSharp Behaviourとして自動変換されます）。<br>
-        2. ワールド内に名簿UI（本モデル、入力UI、表示UI）を配置し、Udon Behaviourをアタッチします。<br>
-        3. Udon Behaviour内の変数設定にて、<b>Base Url</b> に <code>Vercelの公開URL/api/join?book_id=手帳ID</code> （例: <code>https://your-app.vercel.app/api/join?book_id=xxxx-xxxx-xxxx-xxxx</code>）を設定します。マルチテナント化に伴い、どの手帳に顧客を登録するかを識別するために、必ずポータル画面で作成した手帳IDを <b><code>?book_id=xxx</code></b> の形式でURLの末尾に付与してください。<br>
-        4. 以下のセキュリティおよびパネル変数を設定します：
+        1. キーボードの <b><code>Ctrl + S</code></b> を押して、シーンの変更を確実に保存します。<br>
+        2. VRChat SDKのビルダー画面を開き、通常通りワールドのビルド＆アップロードを行ってください。<br>
+        3. アップロード完了後、VRChat内で記名テストを行い、顧客管理ポータルのダッシュボードにリアルタイムで反映されれば接続完了です。
       </p>
-      <ul>
-        <li><code>Passcode</code> : キャスト閲覧ページを開くための任意の暗証番号（数字4桁など）を入力。</li>
-        <li><code>Guest Panel</code> : 一般ゲストがコメントを入力するパネルGameObjectをアタッチ。</li>
-        <li><code>Lock Panel</code> : パスコードを入力するロック画面GameObjectをアタッチ。</li>
-        <li><code>Cast Panel</code> : ロック解除後に表示されるキャスト用の名簿表示GameObjectをアタッチ。</li>
-        <li><code>Passcode Input Field</code> : 暗証番号を入力するInputFieldUIをアタッチ。</li>
-      </ul>
-      <p>
-        5. 各種ボタンの <code>OnClick</code> イベントにUdonの <code>SendCustomEvent</code> を登録します：
-      </p>
-      <ul>
-        <li>コメント送信ボタン : <code>OnRegisterClick</code></li>
-        <li>ロック解除ボタン : <code>OnUnlockClick</code></li>
-        <li>再びロックするボタン : <code>OnLockClick</code></li>
-      </ul>
     </div>
 
     <h2>3. 動作仕様</h2>
     <h3>自動来店カウント（12時間重複防止）</h3>
     <p>
-      ゲストがワールドに入室した時点で、Udonが自動的にVercel APIを経由してデータベースへ入室通知を送ります。<br>
+      ゲストがワールドに入室した時点で、Udonが自動的にAPIを経由してデータベースへ入室通知を送ります。<br>
       この際、前回の入室日時から<b>12時間以上</b>経過していた場合、新しい「来店」とみなして来店カウントが自動的に `+1` されます。<br>
       12時間以内の再入室（回線落ちによる再接続など）のときは、来店数はカウントアップされずにログイン情報のみが記録されます。
     </p>
@@ -393,7 +275,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE public.realtime_events;</code></pr
     <h2>4. サポート・利用規約</h2>
     <p>
       ・本アセットの改変、および購入者個人（または所属店舗）のイベントでの利用は自由です。<br>
-      ・本アセットに含まれるプログラムファイル、3Dモデル等をそのまま第三者へ二次配布することは禁止します。
+      ・本アセットに含まれるプログラムファイルの二次配布（改変有無にかかわらず）は禁止します。
     </p>
     <p style="text-align: center; margin-top: 50px; color: var(--text-muted); font-size: 11px;">
       &copy; 2026 VRC Cast Companion Project. All rights reserved.
