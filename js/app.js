@@ -214,6 +214,39 @@ async function saveData() {
   } catch (e) {
     // デバッグサーバーが動いていない場合は無視
   }
+
+  // Supabaseに一括保存 (upsert)
+  if (dbClient && currentBookId) {
+    try {
+      const dbGuests = guests.map(guest => ({
+        id: guest.id,
+        book_id: currentBookId, // 手帳IDを付与
+        name: guest.name,
+        pronunciation: guest.pronunciation || '',
+        vrc_name: guest.vrcName || '',
+        x_id: guest.xId || '',
+        discord_id: guest.discordId || '',
+        first_visit: guest.firstVisit || null,
+        last_visit: guest.lastVisit || null,
+        visit_count: guest.visitCount || 1,
+        is_cast: guest.isCast || false,
+        is_active_today: guest.isActiveToday || false,
+        gender: guest.gender || '',
+        tags: guest.tags || [],
+        characteristics: guest.characteristics || '',
+        notes: guest.notes || []
+      }));
+      
+      if (dbGuests.length > 0) {
+        const { error } = await dbClient
+          .from('guests')
+          .upsert(dbGuests);
+        if (error) throw error;
+      }
+    } catch (e) {
+      console.error("[Supabase] 一括保存に失敗しました:", e);
+    }
+  }
 }
 
 async function saveGuest(guest) {
