@@ -807,6 +807,10 @@ function openSettingsModal() {
   document.getElementById('import-btn').disabled = true;
   document.getElementById('import-file-input').value = '';
   
+  document.getElementById('selected-csv-file-name').textContent = "選択されていません";
+  document.getElementById('import-csv-btn').disabled = true;
+  document.getElementById('import-csv-file-input').value = '';
+  
   // しきい値を入力欄にセット
   document.getElementById('threshold-semi-regular').value = semiRegularThreshold;
   document.getElementById('threshold-regular').value = regularThreshold;
@@ -1062,6 +1066,13 @@ function setupEventListeners() {
   document.getElementById('import-file-input').addEventListener('change', handleImportFileChange);
   document.getElementById('import-btn').addEventListener('click', importData);
   document.getElementById('demo-data-btn').addEventListener('click', generateDemoData);
+  
+  // CSV関連
+  document.getElementById('import-csv-trigger-btn').addEventListener('click', () => {
+    document.getElementById('import-csv-file-input').click();
+  });
+  document.getElementById('import-csv-file-input').addEventListener('change', handleCsvFileChange);
+  document.getElementById('import-csv-btn').addEventListener('click', importCsvData);
   
   // しきい値の保存処理
   const saveThresholdsBtn = document.getElementById('save-thresholds-btn');
@@ -1356,3 +1367,190 @@ window.quickRegisterGuest = function(name) {
   document.getElementById('form-vrc-name').value = name;
   document.getElementById('toast').style.display = 'none';
 };
+
+function handleCsvFileChange(e) {
+  const file = e.target.files[0];
+  const label = document.getElementById('selected-csv-file-name');
+  const importBtn = document.getElementById('import-csv-btn');
+  
+  if (file) {
+    label.textContent = file.name;
+    importBtn.disabled = false;
+  } else {
+    label.textContent = "選択されていません";
+    importBtn.disabled = true;
+  }
+}
+
+async function importCsvData() {
+  const fileInput = document.getElementById('import-csv-file-input');
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const importBtn = document.getElementById('import-csv-btn');
+  importBtn.disabled = true;
+  importBtn.textContent = "インポート中...";
+
+  const reader = new FileReader();
+  reader.onload = async function(e) {
+    try {
+      const text = e.target.result;
+      const lines = parseCSV(text);
+      
+      if (lines.length <= 1) {
+        throw new Error("CSVファイルにデータが含まれていません。");
+      }
+
+      // ヘッダー名トリミングとエスケープ解除
+      const headers = lines[0].map(h => h.trim().replace(/^"|"$/g, ''));
+      
+      // 列マッピングの特定
+      const colIdx = {
+        name: headers.findIndex(h => h === '名前'),
+        pronunciation: headers.findIndex(h => h === 'ふりがな'),
+        vrcName: headers.findIndex(h => h === 'VRChat名' || h === 'VRChatユーザー名'),
+        xId: headers.findIndex(h => h === 'X_ID' || h === 'X ID' || h === 'X'),
+        discordId: headers.findIndex(h => h === 'Discord_ID' || h === 'Discord ID' || h === 'Discord'),
+        gender: headers.findIndex(h => h === '性別'),
+        firstVisit: headers.findIndex(h => h === '初回来店日'),
+        lastVisit: headers.findIndex(h => h === '最終来店日'),
+        visitCount: headers.findIndex(h => h === '来店回数'),
+        isCast: headers.findIndex(h => h === 'キャスト'),
+        characteristics: headers.findIndex(h => h === '特徴'),
+        tags: headers.findIndex(h => h === 'タグ')
+      };
+
+      if (colIdx.name === -1) {
+        throw new Error("「名前」列が見つかりません。ヘッダー行を確認してください。");
+      }
+
+      let addedCount = 0;
+      let updatedCount = 0;
+
+      for (let i = 1; i < lines.length; i++) {
+        const row = lines[i];
+        if (row.length <= 1 && !row[0]) continue; // 空行
+
+        const nameVal = colIdx.name !== -1 ? (row[colIdx.name] || '').trim() : '';
+        if (!nameVal) continue; // 名前が空
+
+        const vrcNameVal = colIdx.vrcName !== -1 ? (row[colIdx.vrcName] || '').trim() : '';
+
+        // 重複チェック (名前またはVRChatユーザー名が一致)
+        let existingIdx = guests.findIndex(g => 
+          g.name.toLowerCase() === nameVal.toLowerCase() ||
+          (vrcNameVal && g.vrcName && g.vrcName.toLowerCase() === vrcNameVal.toLowerCase())
+        );
+
+        const parsedTags = colIdx.tags !== -1 && row[colIdx.tags]
+          ? row[colIdx.tags].split(/[,，\s]+/).map(t => t.trim()).filter(t => t.length > 0)
+          : [];
+
+        const isCastVal = colIdx.isCast !== -1 && row[colIdx.isCast]
+          ? ['はい', '1', 'true', 'yes', 'キャスト', '対象'].includes(row[colIdx.isCast].trim().toLowerCase())
+          : false;
+
+        const guestData = {
+          name: nameVal,
+          pronunciation: colIdx.pronunciation !== -1 ? (row[colIdx.pronunciation] || '').trim() : '',
+          vrcName: vrcNameVal,
+          xId: colIdx.xId !== -1 ? (row[colIdx.xId] || '').trim() : '',
+          discordId: colIdx.discordId !== -1 ? (row[colIdx.discordId] || '').trim() : '',
+          gender: colIdx.gender !== -1 ? (row[colIdx.gender] || '').trim() : '',
+          firstVisit: colIdx.firstVisit !== -1 ? (row[colIdx.firstVisit] || '').trim() : '',
+          lastVisit: colIdx.lastVisit !== -1 ? (row[colIdx.lastVisit] || '').trim() : '',
+          visitCount: colIdx.visitCount !== -1 ? (parseInt(row[colIdx.visitCount], 10) || 1) : 1,
+          isCast: isCastVal,
+          isActiveToday: false,
+          tags: parsedTags,
+          characteristics: colIdx.characteristics !== -1 ? (row[colIdx.characteristics] || '').trim() : '',
+          notes: []
+        };
+
+        if (existingIdx !== -1) {
+          // 上書き更新（notesは消さない）
+          guests[existingIdx] = {
+            ...guests[existingIdx],
+            ...guestData,
+            notes: guests[existingIdx].notes || []
+          };
+          await saveGuest(guests[existingIdx]);
+          updatedCount++;
+        } else {
+          // 新規追加
+          const newGuest = {
+            id: 'guest-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+            ...guestData
+          };
+          guests.push(newGuest);
+          await saveGuest(newGuest);
+          addedCount++;
+        }
+      }
+
+      showToast(`📊 CSVインポート完了！(新規追加: ${addedCount}件, 更新: ${updatedCount}件)`);
+      closeSettingsModal();
+      renderGuestList();
+    } catch (err) {
+      alert("CSVファイルのインポートに失敗しました:\n" + err.message);
+      console.error(err);
+    } finally {
+      importBtn.disabled = false;
+      importBtn.textContent = "📊 CSVデータを追加する";
+    }
+  };
+
+  reader.onerror = function() {
+    alert("ファイルの読み込み中にエラーが発生しました。");
+    importBtn.disabled = false;
+    importBtn.textContent = "📊 CSVデータを追加する";
+  };
+
+  // 文字化けを防ぐため UTF-8 で読み込み
+  reader.readAsText(file, 'utf-8');
+}
+
+// 簡易CSVパーサー (ダブルクォーテーションや改行対応)
+function parseCSV(text) {
+  const lines = [];
+  let row = [""];
+  let inQuotes = false;
+  
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    const next = text[i+1];
+    
+    if (inQuotes) {
+      if (c === '"') {
+        if (next === '"') {
+          row[row.length - 1] += '"';
+          i++; // 次のダブルクォーテーションをスキップ
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        row[row.length - 1] += c;
+      }
+    } else {
+      if (c === '"') {
+        inQuotes = true;
+      } else if (c === ',') {
+        row.push("");
+      } else if (c === '\r' || c === '\n') {
+        if (c === '\r' && next === '\n') {
+          i++;
+        }
+        lines.push(row);
+        row = [""];
+      } else {
+        row[row.length - 1] += c;
+      }
+    }
+  }
+  
+  if (row.length > 1 || row[0] !== "") {
+    lines.push(row);
+  }
+  
+  return lines;
+}

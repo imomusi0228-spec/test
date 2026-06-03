@@ -328,6 +328,22 @@
             <button id="import-btn" class="btn btn-danger" disabled>📤 データを復元する</button>
           </div>
         </details>
+
+        <details class="settings-details">
+          <summary class="settings-summary">
+            <h4>📊 CSVからのインポート（データ追加）</h4>
+            <span class="accordion-icon">▼</span>
+          </summary>
+          <div class="settings-content">
+            <p>Excel等から書き出したCSVファイル（.csv）から、既存のデータを消さずに顧客データを追加・更新します。</p>
+            <div class="import-row" style="margin-bottom: 10px;">
+              <input type="file" id="import-csv-file-input" accept=".csv" style="display: none;">
+              <button id="import-csv-trigger-btn" class="btn btn-secondary">📁 CSVファイルを選択</button>
+              <span id="selected-csv-file-name" class="file-name">選択されていません</span>
+            </div>
+            <button id="import-csv-btn" class="btn btn-primary" disabled>📊 CSVデータを追加する</button>
+          </div>
+        </details>
         
         <details class="settings-details">
           <summary class="settings-summary">
