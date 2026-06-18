@@ -104,6 +104,9 @@ module.exports = async (req, res) => {
       }
     }
 
+    // リカバリーキーの生成
+    const recoveryKey = generateRecoveryKey();
+
     // 3. プロフィール情報(member_profiles)をデータベースにインサート
     const { error: profileError } = await supabase
       .from('member_profiles')
@@ -112,7 +115,9 @@ module.exports = async (req, res) => {
         org_id: targetOrgId,
         display_name: display_name,
         vrc_name: vrc_name || '',
-        role: role
+        role: role,
+        username: username.toLowerCase(),
+        recovery_key: recoveryKey
       });
 
     if (profileError) {
@@ -130,7 +135,7 @@ module.exports = async (req, res) => {
       if (bookError) console.error('初期手帳の作成に失敗しました:', bookError);
     }
 
-    return res.status(200).json({ success: true, username: username });
+    return res.status(200).json({ success: true, username: username, recovery_key: recoveryKey });
 
   } catch (err) {
     console.error('[Signup API Error]:', err);
@@ -145,3 +150,15 @@ module.exports = async (req, res) => {
     return res.status(500).json({ error: 'サーバー内部エラーが発生しました: ' + err.message });
   }
 };
+
+// リカバリーキー（復元コード）の生成関数
+function generateRecoveryKey() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = 'RC-';
+  for (let i = 0; i < 12; i++) {
+    if (i > 0 && i % 4 === 0) result += '-';
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
