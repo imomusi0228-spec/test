@@ -44,28 +44,36 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters.' });
     }
 
-    // 1. プロフィールから該当ユーザーを検索してリカバリーキーを照合
+    // 1. 特権権限でユーザーリストを取得し、該当ユーザーとリカバリーキーを照合
     const cleanUsername = username.trim().toLowerCase();
     const cleanKey = recovery_key.trim().toUpperCase();
+    const email = "vrc-companion-" + cleanUsername + "@gmail.com";
 
-    const { data: profile, error: profileError } = await supabase
-      .from('member_profiles')
-      .select('id, recovery_key')
-      .eq('username', cleanUsername)
-      .maybeSingle(); // エラーを出さずに単一またはnullを取得
+    const { data: authData, error: authListError } = await supabase.auth.admin.listUsers({
+      perPage: 1000 // ページネーション漏れを防ぐため十分大きな値に設定
+    });
 
-    if (profileError || !profile) {
-      // セキュリティのため、ユーザーIDが存在しない場合もキー不一致と同じ一般的なエラーを返す
+    if (authListError || !authData || !authData.users) {
+      console.error('Failed to list users:', authListError);
       return res.status(400).json({ error: 'ユーザーIDまたはリカバリーキーが正しくありません。' });
     }
 
-    if (!profile.recovery_key || profile.recovery_key.trim().toUpperCase() !== cleanKey) {
+    const targetUser = authData.users.find(u => u.email && u.email.toLowerCase() === email);
+
+    if (!targetUser) {
+      return res.status(400).json({ error: 'ユーザーIDまたはリカバリーキーが正しくありません。' });
+    }
+
+    const metadata = targetUser.user_metadata || {};
+    const storedKey = metadata.recovery_key || '';
+
+    if (!storedKey || storedKey.trim().toUpperCase() !== cleanKey) {
       return res.status(400).json({ error: 'ユーザーIDまたはリカバリーキーが正しくありません。' });
     }
 
     // 2. 特権権限でユーザーのログイン用パスワードを更新
     const { error: authUpdateError } = await supabase.auth.admin.updateUserById(
-      profile.id,
+      targetUser.id,
       { password: new_password }
     );
 

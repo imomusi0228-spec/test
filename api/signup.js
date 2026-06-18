@@ -57,7 +57,9 @@ module.exports = async (req, res) => {
       user_metadata: {
         display_name: display_name,
         vrc_name: vrc_name || '',
-        role: role
+        role: role,
+        username: username.toLowerCase(),
+        recovery_key: recoveryKey
       }
     });
 
@@ -115,9 +117,7 @@ module.exports = async (req, res) => {
         org_id: targetOrgId,
         display_name: display_name,
         vrc_name: vrc_name || '',
-        role: role,
-        username: username.toLowerCase(),
-        recovery_key: recoveryKey
+        role: role
       });
 
     if (profileError) {
