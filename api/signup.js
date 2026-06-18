@@ -45,6 +45,9 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters.' });
     }
 
+    // リカバリーキーの生成
+    const recoveryKey = generateRecoveryKey();
+
     const DUMMY_PREFIX = "vrc-companion-";
     const DUMMY_DOMAIN = "@gmail.com";
     const email = DUMMY_PREFIX + username.toLowerCase() + DUMMY_DOMAIN;
@@ -106,8 +109,7 @@ module.exports = async (req, res) => {
       }
     }
 
-    // リカバリーキーの生成
-    const recoveryKey = generateRecoveryKey();
+
 
     // 3. プロフィール情報(member_profiles)をデータベースにインサート
     const { error: profileError } = await supabase
