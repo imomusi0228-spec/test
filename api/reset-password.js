@@ -81,7 +81,7 @@ module.exports = async (req, res) => {
       throw authUpdateError;
     }
 
-    return res.status(200).json({ success: true, message: 'パスワードが正常に更新されましたわ。' });
+    return res.status(200).json({ success: true, message: 'パスワードが正常に更新されました。' });
 
   } catch (err) {
     console.error('[Reset Password API Error]:', err);

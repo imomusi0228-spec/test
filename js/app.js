@@ -605,7 +605,7 @@ function renderTimeline(notes) {
     // メモ削除イベント
     item.querySelector('.delete-note-btn').addEventListener('click', (e) => {
       const noteId = e.target.dataset.noteId;
-      if (confirm('このメモを削除してもいいかい？')) {
+      if (confirm('このメモを削除しますか？')) {
         deleteNote(noteId);
       }
     });
@@ -624,7 +624,7 @@ function addNote() {
   const date = dateInput.value || getTodayDateString();
   
   if (!content) {
-    showToast("メモの内容を入力しておくれ");
+    showToast("メモの内容を入力してください。");
     return;
   }
   
@@ -787,7 +787,7 @@ async function handleGuestFormSubmit(e) {
     guests.push(newGuest);
     await saveGuest(newGuest);
     selectedGuestId = newGuest.id; // 新規追加した人を自動選択
-    showToast("新しく顧客を顧客名簿に加えたよ");
+    showToast("新しく顧客を顧客名簿に登録しました。");
   }
   
   closeGuestModal();
@@ -798,7 +798,7 @@ async function handleGuestFormSubmit(e) {
 }
 
 async function deleteGuest(id) {
-  if (!confirm("本当にこの顧客を削除するかい？メモや会話履歴もすべて消えてしまうよ。")) {
+  if (!confirm("本当にこの顧客を削除しますか？メモや会話履歴もすべて消えてしまいます。")) {
     return;
   }
   
@@ -939,7 +939,7 @@ function importData() {
   const file = fileInput.files[0];
   if (!file) return;
   
-  if (!confirm("現在のデータはすべて上書きされるけど、本当に復元していいかい？")) {
+  if (!confirm("現在のデータはすべて上書きされますが、本当に復元しますか？")) {
     return;
   }
   

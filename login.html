@@ -753,7 +753,7 @@
         // 確認ボタンのイベント紐付け
         document.getElementById('btn-recovery-confirm').onclick = () => {
           recoveryModal.style.display = 'none';
-          showSuccess('アカウントの作成および登録が完了しました！ポータルへ遷移しますわ。');
+          showSuccess('アカウントの作成および登録が完了しました！ポータルへ遷移します。');
           setTimeout(() => {
             window.location.href = 'portal.html';
           }, 800);
@@ -793,10 +793,10 @@
 
         const result = await res.json();
         if (!res.ok) {
-          throw new Error(result.error || 'パスワードの再設定に失敗しましたわ。');
+          throw new Error(result.error || 'パスワードの再設定に失敗しました。');
         }
 
-        showSuccess('パスワードが正常に更新されましたわ！新しいパスワードでログインしてください。');
+        showSuccess('パスワードが正常に更新されました！新しいパスワードでログインしてください。');
         setLoading(submitBtn, loading, false);
         
         // フォームをリセットしてログイン画面に戻す
@@ -815,7 +815,7 @@
     function copyRecoveryKey() {
       const keyText = document.getElementById('display-recovery-key').textContent;
       navigator.clipboard.writeText(keyText).then(() => {
-        alert('リカバリーキーをコピーしましたわ！安全な場所に保存してください。');
+        alert('リカバリーキーをコピーしました！安全な場所に保存してください。');
       }).catch(err => {
         console.error('Copy failed:', err);
         alert('コピーに失敗しました。直接ドラッグしてコピーしてください。');
@@ -868,7 +868,7 @@
       </div>
       <div class="modal-body" style="text-align: center; margin-top: 15px;">
         <p style="font-size: 0.85rem; color: var(--text-primary); line-height: 1.6; margin-bottom: 20px;">
-          パスワードを忘れた際、アカウントを救済するための大切な **リカバリーキー（復元コード）** ですわ。<br>
+          パスワードを忘れた際、アカウントを救済するための大切な **リカバリーキー（復元コード）** です。<br>
           再発行はできませんので、必ず安全な場所にコピーして保管してください。
         </p>
         
